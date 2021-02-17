@@ -13,6 +13,9 @@ output:
 ## Usage
 
 Build the docker container which contains all scripts with `make`.
+The built docker image is tagged as `seglh/exomedepth:latest`.
+
+
 
 The docker image contains all required packages and scripts but no reference genome.
 
