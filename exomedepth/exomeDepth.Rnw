@@ -1,0 +1,146 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[margin=1.1 in]{geometry}
+\usepackage[parfill]{parskip}
+\usepackage{fancyhdr}
+\usepackage{multicol}
+\setlength{\columnsep}{0cm}
+
+% font
+\renewcommand{\familydefault}{\sfdefault}  % sans font
+% redefine headers
+\renewcommand{\thesection}{}
+\renewcommand{\thesubsection}{\arabic{section}.\arabic{subsection}}
+% redefine section headers and title page
+\makeatletter
+\renewcommand{\maketitle}{\bgroup\setlength{\parindent}{0pt}
+\begin{flushleft}
+  \textbf{\large{\@title}}
+
+  \@author
+\end{flushleft}\egroup
+}
+\def\@seccntformat#1{\csname #1ignore\expandafter\endcsname\csname the#1\endcsname\quad}
+\let\sectionignore\@gobbletwo
+\let\latex@numberline\numberline
+\def\numberline#1{\if\relax#1\relax\else\latex@numberline{#1}\fi}
+\makeatother
+
+% define title
+\title{CNV Analysis}
+\author{SEGLH}
+
+% configure fancyheaders
+\pagestyle{fancy}
+\renewcommand{\sectionmark}[1]{\markright{#1}}
+\fancyhf{}
+<<headnote, echo=FALSE, message=FALSE, results='asis' >>=
+cat(paste(c("\\lhead{SEGLH/ExomeDepth ",pipeversion,"}"),collate="",sep=""))
+@
+\rhead{\rightmark}
+\lfoot{\today}
+\rfoot{Page \thepage}
+
+% DOCUMENT
+\begin{document}
+\maketitle
+\textbf{Panel:} \Sexpr{gsub("_"," ",panel[2])} \\
+\textbf{Targets:} \Sexpr{gsub("_"," ",panel[1])} \\
+\textbf{Sample and references:} \Sexpr{gsub("_"," ",bam)}
+
+<<functions, echo=FALSE, message=FALSE>>=
+summarizeGene<-function(x) paste(unique(sapply( strsplit( unlist(strsplit(x,'[,]')) ,'_'),"[[",1)),collapse=',')
+plotCNVs<-function(res, extend=1000,fullgene=TRUE) {
+  # reorder and remove BF<0
+  cnvs<-res@CNV.calls[ order(res@CNV.calls$BF, decreasing = TRUE),]
+  cnvs<-cnvs[which(cnvs$BF>0),]
+  annot<-res@annotations
+  if (nrow(cnvs)>0) {
+    for (i in 1:nrow(cnvs)) {
+      message(paste(cnvs[i,],collapse=' '))
+      message('--------------\n')
+      # get plot limits
+      chromosome<-cnvs[i,'chromosome']
+      if (fullgene) {
+          # get gene limits
+          chrom<-cnvs[i,'chromosome']
+          chromStart<-cnvs[i,'start']
+          chromEnd<-cnvs[i,'end']
+          genes<-as.character(unique(annot[which(annot$chromosome==chrom & annot$end>chromStart & annot$start<chromEnd),'name']))
+          if (length(genes)>0) {
+              start<-min(annot[which(annot$name%in%genes),'start']) - extend
+              end<-max(annot[which(annot$name%in%genes),'end']) + extend
+          } else {
+              start<-cnvs[i,'start'] - extend
+              end<-cnvs[i,'end'] + extend
+          }
+      } else {
+          start<-cnvs[i,'start'] - extend
+          end<-cnvs[i,'end'] + extend
+      }
+      # get gene and exon names
+      e<-unlist(strsplit(as.character(cnvs[i,'exons.hg19']),'[,]'))
+      g<-unique(sapply(strsplit(as.character( e ),'_'),"[[",1))
+      # plot
+      possibleError<-tryCatch(
+        plot(res, sequence = chromosome, xlim = c(start, end), count.threshold = 20,
+          with.gene=TRUE, main=paste(g,collapse=',')),
+        error = function(err) err
+      )
+      # add CNV overlay and BF
+      cnvcolour<-ifelse(cnvs[i,'reads.ratio']<1, '#FF000044', '#00FF0044')
+      rect(as.numeric(cnvs[i,'start']), -0.1, cnvs[i,'end'], 1.1, col = cnvcolour, border=NA)
+      text(cnvs[i,'end'],0.7,pos=4,labels=cnvs[i,'BF'])# # annotate with Bayes Factor
+    }
+  }
+}
+@
+
+<<table, size='footnotesize', results='asis', echo=FALSE, message=FALSE, fig.width=9, fig.height=4, out.width='1.0\\linewidth' >>=
+for(testsample in names(results)){
+  cat(paste0('\\section{Sample ',gsub("_"," ",testsample),'}'))
+  if (suppressWarnings(is.na(results[[testsample]]))) {
+    cat("\\textbf{NEED AT LEAST 2 REFERENCE SAMPLES TO RUN CNV ANALYSIS.}")
+  } else if (!is.object(results[[testsample]])) {
+    # no results (no CNVs?)
+    cat("\\textbf{Selected reference: }")
+    cat(paste(gsub("_"," ",unlist(refsets[[testsample]]$reference.choice)),collapse=', '))
+    cat('\n\n\n')
+    cat("\\textbf{NO CNVs CALLED.}")
+    cat('\n\\newpage')
+  } else {
+    cnvs<-results[[testsample]]@CNV.calls[ order(results[[testsample]]@CNV.calls$BF, decreasing = TRUE),]
+    cnvs[,'genes']<-unlist(lapply(cnvs[,'exons.hg19'],summarizeGene))
+    cnvtable<-cnvs[which(cnvs$BF>0),c('id','type','BF','reads.expected','reads.ratio','genes')]
+    pagerows<-60
+    subtables<-ceiling(nrow(cnvtable)/pagerows)
+    for (i in 1:subtables) {
+      startrow<-((i-1)*pagerows)+1
+      endrow<-min(nrow(cnvtable), i*pagerows)
+      message(paste('STARTROW',startrow))
+      message(paste('ENDROW',endrow))
+      cat("\\begin{scriptsize}")
+      print(kable(cnvtable[startrow:endrow,], row.names=FALSE, format='latex'))
+      cat("\\end{scriptsize}")
+      cat("\\\\")
+      cat("\\begin{tiny}")
+      cat(paste("\\textbf{Table ",i,"/",subtables,'  }',sep=""))
+      cat("\\textit{CNVs with negative bayes factors have been omitted.}")
+      cat("\\end{tiny}")
+      if (i!=subtables) {
+        cat('\\newpage')
+      } else cat('\\\\\\\\')
+    }
+    cat("\\textbf{Selected reference: }")
+    cat(paste(gsub("_"," ",unlist(refsets[[testsample]]$reference.choice)),collapse=', '))
+    cat('\n\n\n')
+    cat("\\subsection*{Coverage plots}")
+    cat("\\begin{multicols*}{2}")
+    plotCNVs(results[[samplename]])
+    cat("\\end{multicols*}")
+    cat('\n\\newpage')
+  }
+}
+@
+
+
+\end{document}
