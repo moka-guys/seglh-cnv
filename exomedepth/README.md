@@ -10,6 +10,18 @@ output:
 
 # SEGLH ExomeDepth pipeline
 
+## input files
+
+The target BED file intervals must be annotated with gene symbol and exon number as follows:
+
+```
+3	128199861	128200161	GATA2_5
+3	128200661	128200787	GATA2_4
+3	128202702	128202848	GATA2_3
+3	128204569	128205211	GATA2_2
+3	128205645	128205874	GATA2_1
+```
+
 ## Usage
 
 Build the docker container which contains all scripts with `make`.
