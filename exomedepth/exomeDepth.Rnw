@@ -3,7 +3,14 @@
 \usepackage[parfill]{parskip}
 \usepackage{fancyhdr}
 \usepackage{multicol}
+\usepackage{mdframed}
+\usepackage{dingbat}
 \setlength{\columnsep}{0cm}
+
+\newenvironment{warning}
+  {\par\begin{mdframed}[linewidth=2pt,linecolor=red]}%
+  {\end{mdframed}\par}%
+% endWarning
 
 % font
 \renewcommand{\familydefault}{\sfdefault}  % sans font
@@ -27,14 +34,14 @@
 
 % define title
 \title{CNV Analysis}
-\author{SEGLH}
+\author{South East Genomics Laboratory Hub}
 
 % configure fancyheaders
 \pagestyle{fancy}
 \renewcommand{\sectionmark}[1]{\markright{#1}}
 \fancyhf{}
 <<headnote, echo=FALSE, message=FALSE, results='asis' >>=
-cat(paste(c("\\lhead{SEGLH/ExomeDepth ",pipeversion,"}"),collate="",sep=""))
+cat(paste(c("\\lhead{ExomeDepth ",pipeversion,"}"),collate="",sep=""))
 @
 \rhead{\rightmark}
 \lfoot{\today}
@@ -45,14 +52,97 @@ cat(paste(c("\\lhead{SEGLH/ExomeDepth ",pipeversion,"}"),collate="",sep=""))
 \maketitle
 \textbf{Panel:} \Sexpr{gsub("_"," ",panel[2])} \\
 \textbf{Targets:} \Sexpr{gsub("_"," ",panel[1])} \\
-\textbf{Sample and references:} \Sexpr{gsub("_"," ",bam)}
+\textbf{Exons:} \Sexpr{gsub("_"," ",length(coveredexons@ranges))}
+\\
 
 <<functions, echo=FALSE, message=FALSE>>=
-summarizeGene<-function(x) paste(unique(sapply( strsplit( unlist(strsplit(x,'[,]')) ,'_'),"[[",1)),collapse=',')
-plotCNVs<-function(res, extend=1000,fullgene=TRUE) {
+summarizeGene<-function(exonstring) {
+  if (is.na(exonstring)) return('Not in ROI')
+  exons<-unlist(strsplit(exonstring, '[,]'))
+  genes<-unique(sapply(strsplit(exons ,'_'),"[[",1))
+  genex<-vector()
+  for (gene in genes) {
+    e<-paste(sort(as.numeric(sapply(strsplit(exons[startsWith(exons,gene)],'_'),"[[",2))),collapse=",")
+    genex<-append(genex,paste(gene,' (Exon ',e,')',sep=""))
+  }
+  paste(genex,collapse=', ')
+}
+not.na<-function(x) !is.na(x)
+CNVconfidence<-function(cnvs) {
+  ifelse(cnvs$reads.expected<50 | (cnvs$reads.ratio>0.75 & cnvs$reads.ratio<1.25),"LOW","HIGH")
+}
+correlationWarning<-function(ref,limit.maxcor=0.98,limit.refcor=0.97) {
+  counts.correlation<-cor(counts[,refsamplenames])
+  sample.correlation<-counts.correlation[ref$summary.stats$ref.samples,testsample]
+  max.correlation<-max(sample.correlation[sample.correlation!=1])
+  ref.correlation<-cor(cbind(counts[,testsample],reference.selected))[1,2]
+  fail.maxcor<-max.correlation<limit.maxcor
+  fail.refcor<-ref.correlation<limit.refcor
+  if (fail.maxcor | fail.refcor) {
+    cat("\\\\")
+    cat("\\begin{warning}")
+    if (fail.maxcor) {
+      cat("\\paragraph*{WARNING}")
+      cat(paste0("Highest sample correlation is below ",limit.maxcor,". "))
+      cat("This could indicate a failed sample.")
+    }
+    if (fail.refcor) {
+      cat("\\paragraph*{WARNING}")
+      cat(paste0("Correlation between reference and tests count is ",round(ref.correlation,3),". "))
+      cat(paste0("To get meaningful result, this correlation should really be above ",limit.refcor,". "))
+      cat("If this is not the case, consider the output of ExomeDepth as less reliable (i.e. most likely a high false positive rate).")
+    }
+    cat("\\end{warning}")
+  }
+}
+sampleTable<-function(ref) {
+  # calculate correlations
+  counts.correlation<-cor(counts[,refsamplenames])
+  refsample.table<-cbind(
+    ref$summary.stats,
+    correlationmax=apply(counts.correlation[ref$summary.stats$ref.samples,],1,function(x) x[x!=1]),
+    correlation=counts.correlation[ref$summary.stats$ref.samples,testsample],
+    selected.ref=sapply(ref$summary.stats$ref.samples%in%ref$reference.choice, function(x) ifelse(x,'Yes',''))
+  )
+  cat("\\begin{scriptsize}")
+  print(kable(refsample.table[,c('expected.BF','phi','RatioSd','median.depth','correlation','selected.ref')]))
+  cat("\\end{scriptsize}")
+}
+lowCoverageExons<-function(pagerows=30) {
+  if (nrow(coverage.table)>0) {
+    subtables<-ceiling(nrow(coverage.table)/pagerows)
+    for (i in 1:subtables) {
+      startrow<-((i-1)*pagerows)+1
+      endrow<-min(nrow(coverage.table), i*pagerows)
+      cat("\\begin{warning}")
+      cat(paste0("\\subsubsection*{Coverage limitations (median below ",limit.coverage,"X)}"))
+      cat("\\begin{scriptsize}")
+      print(kable(coverage.table[startrow:endrow,], row.names=FALSE, format='latex'))
+      cat("\\end{scriptsize}")
+      cat("\\end{warning}")
+    }
+  }
+}
+paginatedCNVtable<-function(cnvtable, pagerows = 60) {
+  subtables<-ceiling(nrow(cnvtable)/pagerows)
+  for (i in 1:subtables) {
+    startrow<-((i-1)*pagerows)+1
+    endrow<-min(nrow(cnvtable), i*pagerows)
+    cat("\\begin{scriptsize}")
+    print(kable(cnvtable[startrow:endrow,], row.names=FALSE, format='latex'))
+    cat("\\end{scriptsize}")
+    cat("\\\\")
+    cat("\\begin{tiny}")
+    cat(paste("\\textbf{Table ",i,"/",subtables,'  }',sep=""))
+    cat("\\textit{CNVs with negative bayes factors have been omitted.}")
+    cat("\\end{tiny}")
+    if (i!=subtables) {
+      cat('\\newpage')
+    } else cat('\\\\\\\\')
+  }
+}
+plotCNVs<-function(res, cnvs, extend=1000, fullgene=TRUE) {
   # reorder and remove BF<0
-  cnvs<-res@CNV.calls[ order(res@CNV.calls$BF, decreasing = TRUE),]
-  cnvs<-cnvs[which(cnvs$BF>0),]
   annot<-res@annotations
   if (nrow(cnvs)>0) {
     for (i in 1:nrow(cnvs)) {
@@ -96,49 +186,42 @@ plotCNVs<-function(res, extend=1000,fullgene=TRUE) {
 @
 
 <<table, size='footnotesize', results='asis', echo=FALSE, message=FALSE, fig.width=9, fig.height=4, out.width='1.0\\linewidth' >>=
-for(testsample in names(results)){
-  cat(paste0('\\section{Sample ',gsub("_"," ",testsample),'}'))
-  if (suppressWarnings(is.na(results[[testsample]]))) {
-    cat("\\textbf{NEED AT LEAST 2 REFERENCE SAMPLES TO RUN CNV ANALYSIS.}")
-  } else if (!is.object(results[[testsample]])) {
-    # no results (no CNVs?)
-    cat("\\textbf{Selected reference: }")
-    cat(paste(gsub("_"," ",unlist(refsets[[testsample]]$reference.choice)),collapse=', '))
-    cat('\n\n\n')
-    cat("\\textbf{NO CNVs CALLED.}")
-    cat('\n\\newpage')
-  } else {
-    cnvs<-results[[testsample]]@CNV.calls[ order(results[[testsample]]@CNV.calls$BF, decreasing = TRUE),]
-    cnvs[,'genes']<-unlist(lapply(cnvs[,'exons.hg19'],summarizeGene))
-    cnvtable<-cnvs[which(cnvs$BF>0),c('id','type','BF','reads.expected','reads.ratio','genes')]
-    pagerows<-60
-    subtables<-ceiling(nrow(cnvtable)/pagerows)
-    for (i in 1:subtables) {
-      startrow<-((i-1)*pagerows)+1
-      endrow<-min(nrow(cnvtable), i*pagerows)
-      message(paste('STARTROW',startrow))
-      message(paste('ENDROW',endrow))
-      cat("\\begin{scriptsize}")
-      print(kable(cnvtable[startrow:endrow,], row.names=FALSE, format='latex'))
-      cat("\\end{scriptsize}")
-      cat("\\\\")
-      cat("\\begin{tiny}")
-      cat(paste("\\textbf{Table ",i,"/",subtables,'  }',sep=""))
-      cat("\\textit{CNVs with negative bayes factors have been omitted.}")
-      cat("\\end{tiny}")
-      if (i!=subtables) {
-        cat('\\newpage')
-      } else cat('\\\\\\\\')
-    }
-    cat("\\textbf{Selected reference: }")
-    cat(paste(gsub("_"," ",unlist(refsets[[testsample]]$reference.choice)),collapse=', '))
-    cat('\n\n\n')
-    cat("\\subsection*{Coverage plots}")
-    cat("\\begin{multicols*}{2}")
-    plotCNVs(results[[samplename]])
-    cat("\\end{multicols*}")
-    cat('\n\\newpage')
-  }
+lowCoverageExons()
+cat(paste0('\\section{Sample ',gsub("_"," ",samplename),'}'))
+cat(paste0('\\textbf{Filename: }', testsample))
+correlationWarning(refsets[[samplename]])
+if (suppressWarnings(is.na(results[[samplename]]))) {
+  cat("\\textbf{NEED AT LEAST 2 REFERENCE SAMPLES TO RUN CNV ANALYSIS.}")
+} else if (!is.object(results[[samplename]])) {
+  # no results (no CNVs?)
+  cat("\\textbf{Selected reference: }")
+  cat(paste(gsub("_"," ",unlist(refsets[[samplename]]$reference.choice)),collapse=', '))
+  cat('\n\n\n')
+  cat("\\textbf{NO CNVs CALLED.}")
+  cat('\n\\newpage')
+} else {
+  # filter CNVs (sort by BF and remove negative BF and unannotated)
+  cnvs<-results[[samplename]]@CNV.calls
+  cnvs<-cnvs[order(cnvs$BF, decreasing = TRUE),]
+  cnvs<-cnvs[which(cnvs$BF>0),]
+  cnvs<-cnvs[which(not.na(cnvs$exons.hg19)),]
+  # rewrite gene+exons string
+  cnvs[,'genes']<-unlist(lapply(cnvs[,'exons.hg19'],summarizeGene))
+  cnvs[,'confidence']<-CNVconfidence(cnvs)
+  cnvtable<-cnvs[which(cnvs$BF>0),c('id','BF','reads.expected','reads.ratio','type','genes','confidence')]
+
+  cat("\\subsection*{Reference samples}")
+  sampleTable(refsets[[samplename]])
+
+  cat("\\subsection*{Called CNVs}")
+  paginatedCNVtable(cnvtable,60)
+  
+  cat("\\subsection*{Coverage plots}")
+  cat("\\begin{multicols*}{2}")
+  plotCNVs(results[[samplename]],cnvs)
+  cat("\\end{multicols*}")
+  
+  cat('\n\\newpage')
 }
 @
 

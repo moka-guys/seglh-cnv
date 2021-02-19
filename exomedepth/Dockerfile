@@ -24,8 +24,12 @@ RUN apt-get --yes install texlive
 
 # LateX packages
 RUN tlmgr init-usertree && \
-	tlmgr update --self && \
-	tlmgr install framed
+	tlmgr update --self
+RUN tlmgr install framed && \
+	tlmgr install mdframed && \
+	tlmgr install zref && \
+	tlmgr install needspace && \
+	tlmgr install dingbat
 
 # R dependencies
 RUN Rscript -e "install.packages('BiocManager');BiocManager::install(version = '3.12')" && \

@@ -37,11 +37,12 @@ selectReferenceSet<-function(df, test.sample, ref.samples, remove.test=TRUE) {
 #
 # READ ARGS
 #
-scriptDirectory<-getwd() # save running directory
-args<-commandArgs(trailingOnly = TRUE)
-setwd(dirname(args[2]))  # set working directory to target directory (THIS IS ABSOLUTELY NECESSARY!)
 cmd<-commandArgs(trailingOnly = FALSE)
 runningScript<-unlist(strsplit(cmd[which(substr(cmd,1,7)=='--file=')],'='))[2]
+scriptDirectory<-normalizePath(dirname(runningScript))
+args<-commandArgs(trailingOnly = TRUE)
+setwd(dirname(args[2]))  # set working directory to target directory (THIS IS ABSOLUTELY NECESSARY!)
+
 #
 # print what will be printed
 #
@@ -73,10 +74,8 @@ if (length(bam)>=3) {
   # read exons/ROI and create subset
   #
   message('Getting ROIs...')
-  counts<-counts[which(counts$exon%in%rois$name),]  # reduce to target regions
-  exons <- GRanges(seqnames = rois$chromosome,
-                   IRanges(start=rois$start,end=rois$end),
-                   names = rois$name)
+  counts<-counts[which(counts$exon%in%rois$name),]  # reduce to target regions (from readCount)
+  exons <- GRanges(seqnames = rois$chromosome, IRanges(start=rois$start,end=rois$end), names = rois$name)
   covered <- with(read.table(panel[1],header=FALSE),
                   GRanges(seqnames = V1, IRanges(start=V2+1, end=V3, names=V4),names=V4))  # BED FILE 0-based
   coveredexons<-subsetByOverlaps(exons,covered)
@@ -90,6 +89,19 @@ if (length(bam)>=3) {
   refsamplenames<-as.vector(sapply(bam,basename))
   normals<-which(unlist(lapply(refsamplenames,function(x) substr(x,1,3)))=='NNN')
   if (length(normals)>2) refsamplenames<-refsamplenames[normals]
+
+  #
+  # Define low coverage exons
+  #
+  limit.coverage<-100
+  exonnames<-coveredexons@elementMetadata@listData$names
+  coverage.df<-data.frame(
+    exon=counts$exon,
+    gc=counts$GC,
+    coverage.min=apply(counts[,refsamplenames],1,min),
+    coverage.median=apply(counts[,refsamplenames],1,median),
+    coverage.max=apply(counts[,refsamplenames],1,max))
+  coverage.table<-coverage.df[which(coverage.df$coverage.median<limit.coverage & coverage.df$exon%in%exonnames),]
 
   # estimate reference set
   refsets[[samplename]]<-selectReferenceSet(counts, testsample, refsamplenames, TRUE)
@@ -117,10 +129,13 @@ if (length(bam)>=3) {
                    name = counts$exon)
 
   # annotate results
+  print(paste('raw CNV count:',length(result@CNV.calls)))
+
+  # 
   message('Annotating CNVs...')
-  print(length(result@CNV.calls))
   if (length(result@CNV.calls)>0) {
-    result.annotated<-AnnotateExtra(x = result, reference.annotation = exons,
+    # add exon numbers (from subset)
+    result.annotated<-AnnotateExtra(x = result, reference.annotation = coveredexons,
       min.overlap = 0.0001, column.name = 'exons.hg19')
     result.annotated@annotations$name<-as.factor(sapply(strsplit(as.character(result.annotated@annotations$name),'_'),"[[",1))
     results[[samplename]]<-result.annotated
@@ -143,7 +158,7 @@ if (length(bam)>=3) {
 # knit report (using refsets, results)
 #
 knitrScript<-paste(scriptDirectory, 'exomeDepth.Rnw', sep='/')
-
+print(knitrScript)
 if (sub(".*[.]","",args[2],perl=TRUE)=="pdf") {
   knit2pdf(knitrScript, output=sub("[.][^.]*$", ".tex", args[2], perl=TRUE))
 }
