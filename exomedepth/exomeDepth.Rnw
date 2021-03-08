@@ -105,7 +105,7 @@ sampleTable<-function(ref) {
     selected.ref=sapply(ref$summary.stats$ref.samples%in%ref$reference.choice, function(x) ifelse(x,'Yes',''))
   )
   cat("\\begin{scriptsize}")
-  print(kable(refsample.table[,c('expected.BF','phi','RatioSd','median.depth','correlation','selected.ref')]))
+  print(kable(refsample.table[,c('expected.BF','RatioSd','median.depth','correlation','selected.ref')]))
   cat("\\end{scriptsize}")
 }
 lowCoverageExons<-function(pagerows=30) {
@@ -188,7 +188,7 @@ plotCNVs<-function(res, cnvs, extend=1000, fullgene=TRUE) {
 <<table, size='footnotesize', results='asis', echo=FALSE, message=FALSE, fig.width=9, fig.height=4, out.width='1.0\\linewidth' >>=
 lowCoverageExons()
 cat(paste0('\\section{Sample ',gsub("_"," ",samplename),'}'))
-cat(paste0('\\textbf{Filename: }', testsample))
+cat(paste0('\\textbf{Filename: }', gsub("_"," ",testsample)))
 correlationWarning(refsets[[samplename]])
 if (suppressWarnings(is.na(results[[samplename]]))) {
   cat("\\textbf{NEED AT LEAST 2 REFERENCE SAMPLES TO RUN CNV ANALYSIS.}")
