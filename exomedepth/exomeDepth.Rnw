@@ -143,8 +143,14 @@ paginatedCNVtable<-function(cnvtable, pagerows = 60) {
     cat("\\end{tiny}")
     if (i!=subtables) {
       cat('\\newpage')
-    } else cat('\\\\\\\\')
+    }
   }
+  #cat("\\subparagraph{Bayes Factor}")
+  cat("\\begin{quote}")
+  cat("The Bayes Factor (BF) is a measure of strength of evidence over the alternate hypothesis (copy number change) over the null hypothesis (no alteration). ")
+  cat("The following evidence levels were suggested by Lee and Wagenmakers (2013): ")
+  cat("1 (no evidence), 1-3 (anecdotal), 3-10 (moderate), 10-30 (strong), 30-100 (very strong), over 100 (extreme). ")
+  cat("\\end{quote}")
 }
 plotCNVs<-function(res, cnvs, extend=1000, fullgene=TRUE) {
   # reorder and remove BF<0
@@ -220,12 +226,14 @@ if (suppressWarnings(is.na(results[[samplename]]))) {
 
   cat("\\subsection*{Called CNVs}")
   paginatedCNVtable(cnvtable,60)
-  
-  cat("\\subsection*{Coverage plots}")
+  #cat("\\begin{verse}Coverage plots on following page.\\end{verse}")
+  cat('\\newpage')
+
+  cat("\\subsubsection*{Coverage plots}")
   cat("\\begin{multicols*}{2}")
   plotCNVs(results[[samplename]],cnvs)
   cat("\\end{multicols*}")
-  
+
   cat('\n\\newpage')
 }
 @
