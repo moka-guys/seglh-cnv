@@ -71,13 +71,14 @@ not.na<-function(x) !is.na(x)
 CNVconfidence<-function(cnvs) {
   ifelse(cnvs$reads.expected<50 | (cnvs$reads.ratio>0.75 & cnvs$reads.ratio<1.25),"LOW","HIGH")
 }
-correlationWarning<-function(ref,limit.maxcor=0.98,limit.refcor=0.97) {
+correlationWarning<-function(ref,limit.maxcor=0.98,limit.refcor=0.97,limit.refcount=3) {
   counts.correlation<-cor(counts[,refsamplenames])
   sample.correlation<-counts.correlation[ref$summary.stats$ref.samples,testsample]
   max.correlation<-max(sample.correlation[sample.correlation!=1])
   ref.correlation<-cor(cbind(counts[,testsample],reference.selected))[1,2]
   fail.maxcor<-max.correlation<limit.maxcor
   fail.refcor<-ref.correlation<limit.refcor
+  fail.refcount<-length(ref$reference.choice)<limit.refcount
   if (fail.maxcor | fail.refcor) {
     cat("\\\\")
     cat("\\begin{warning}")
@@ -91,6 +92,10 @@ correlationWarning<-function(ref,limit.maxcor=0.98,limit.refcor=0.97) {
       cat(paste0("Correlation between reference and tests count is ",round(ref.correlation,3),". "))
       cat(paste0("To get meaningful result, this correlation should really be above ",limit.refcor,". "))
       cat("If this is not the case, consider the output of ExomeDepth as less reliable (i.e. most likely a high false positive rate).")
+    }
+    if (fail.refcount) {
+      cat("\\paragraph*{WARNING}")
+      cat(paste0("Number of used reference samples is below ",limit.refcount,". "))
     }
     cat("\\end{warning}")
   }
