@@ -115,17 +115,17 @@ sampleTable<-function(ref) {
 }
 lowCoverageExons<-function(pagerows=30) {
   if (nrow(coverage.table)>0) {
+    cat("\\begin{warning}")
+    cat(paste0("\\subsubsection*{Coverage limitations (median below ",limit.coverage,"X)}"))
+    cat("\\begin{scriptsize}")
     subtables<-ceiling(nrow(coverage.table)/pagerows)
     for (i in 1:subtables) {
       startrow<-((i-1)*pagerows)+1
       endrow<-min(nrow(coverage.table), i*pagerows)
-      cat("\\begin{warning}")
-      cat(paste0("\\subsubsection*{Coverage limitations (median below ",limit.coverage,"X)}"))
-      cat("\\begin{scriptsize}")
       print(kable(coverage.table[startrow:endrow,], row.names=FALSE, format='latex'))
-      cat("\\end{scriptsize}")
-      cat("\\end{warning}")
     }
+    cat("\\end{scriptsize}")
+    cat("\\end{warning}")
   }
 }
 paginatedCNVtable<-function(cnvtable, pagerows = 60) {
@@ -142,7 +142,7 @@ paginatedCNVtable<-function(cnvtable, pagerows = 60) {
     cat("\\textit{CNVs with negative bayes factors have been omitted.}")
     cat("\\end{tiny}")
     if (i!=subtables) {
-      cat('\\newpage')
+      cat('\n\\newpage')
     }
   }
   #cat("\\subparagraph{Bayes Factor}")
@@ -203,39 +203,44 @@ cat(paste0('\\textbf{Filename: }', gsub("_"," ",testsample)))
 correlationWarning(refsets[[samplename]])
 if (suppressWarnings(is.na(results[[samplename]]))) {
   cat("\\textbf{NEED AT LEAST 2 REFERENCE SAMPLES TO RUN CNV ANALYSIS.}")
-} else if (!is.object(results[[samplename]])) {
-  # no results (no CNVs?)
-  cat("\\textbf{Selected reference: }")
-  cat(paste(gsub("_"," ",unlist(refsets[[samplename]]$reference.choice)),collapse=', '))
-  cat('\n\n\n')
-  cat("\\textbf{NO CNVs CALLED.}")
-  cat('\n\\newpage')
 } else {
-  # filter CNVs (sort by BF and remove negative BF and unannotated)
-  cnvs<-results[[samplename]]@CNV.calls
-  cnvs<-cnvs[order(cnvs$BF, decreasing = TRUE),]
-  cnvs<-cnvs[which(cnvs$BF>0),]
-  cnvs<-cnvs[which(not.na(cnvs$exons.hg19)),]
-  # rewrite gene+exons string
-  cnvs[,'genes']<-unlist(lapply(cnvs[,'exons.hg19'],summarizeGene))
-  cnvs[,'confidence']<-CNVconfidence(cnvs)
-  cnvtable<-cnvs[which(cnvs$BF>0),c('id','BF','reads.expected','reads.ratio','type','genes','confidence')]
-
+  # PRINT REFERENCE SAMPLES
   cat("\\subsection*{Reference samples}")
   sampleTable(refsets[[samplename]])
-
+  # PRINT CNVs
   cat("\\subsection*{Called CNVs}")
-  paginatedCNVtable(cnvtable,60)
-  #cat("\\begin{verse}Coverage plots on following page.\\end{verse}")
-  cat('\\newpage')
-
-  cat("\\subsubsection*{Coverage plots}")
-  cat("\\begin{multicols*}{2}")
-  plotCNVs(results[[samplename]],cnvs)
-  cat("\\end{multicols*}")
-
-  cat('\n\\newpage')
+  if (!is.object(results[[samplename]])) {
+    cat('\n\n\n')
+    cat("\\textbf{NO CNVs CALLED.}")
+  } else {
+    # filter CNVs (sort by BF and remove negative BF and unannotated)
+    cnvs<-results[[samplename]]@CNV.calls
+    cnvs<-cnvs[order(cnvs$BF, decreasing = TRUE),]
+    cnvs<-cnvs[which(cnvs$BF>0),]
+    cnvs<-cnvs[which(not.na(cnvs$exons.hg19)),]
+    # rewrite gene+exons string
+    cnvs[,'genes']<-unlist(lapply(cnvs[,'exons.hg19'],summarizeGene))
+    cnvs[,'confidence']<-CNVconfidence(cnvs)
+    if (!!nrow(cnvs)) {
+      cnvtable<-cnvs[which(cnvs$BF>0),c('id','BF','reads.expected','reads.ratio','type','genes','confidence')]
+      paginatedCNVtable(cnvtable,60)
+      #cat("\\begin{verse}Coverage plots on following page.\\end{verse}")
+      #cat('\n\\newpage')
+      cat("\\subsubsection*{Coverage plots}")
+      cat("\\begin{multicols*}{2}")
+      plotCNVs(results[[samplename]],cnvs)
+      cat("\\end{multicols*}")
+      #cat('\n\\newpage')
+    } else {
+      cat('\n\n\n')
+      cat("\\textbf{NO CNVs CALLED.}")
+    }
+  }
 }
+#cat("\\\\")
+#cat("\\begin{center}")
+#cat("\\textit{--- END OF REPORT ---}")
+#cat("\\end{center}")
 @
 
 
