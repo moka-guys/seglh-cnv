@@ -103,6 +103,12 @@ if (length(bam)>=3) {
     coverage.max=apply(counts[,refsamplenames],1,max))
   coverage.table<-coverage.df[which(coverage.df$coverage.median<limit.coverage & coverage.df$exon%in%exonnames),]
 
+  #
+  # get dispersion and correlation metrics
+  #
+  #refsamplestats<-lapply(refsamplenames, function(testsample) selectReferenceSet(counts, testsample, refsamplenames, TRUE)$summary.stats)
+  #names(refsamplestats)<-refsamplenames
+
   # estimate reference set
   refsets[[samplename]]<-selectReferenceSet(counts, testsample, refsamplenames, TRUE)
   #

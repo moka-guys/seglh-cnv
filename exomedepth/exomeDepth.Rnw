@@ -194,10 +194,27 @@ plotCNVs<-function(res, cnvs, extend=1000, fullgene=TRUE) {
     }
   }
 }
+plotRefsampleStats<-function() {
+  bamstats.cor<-t(as.data.frame(do.call(rbind, lapply(bamstats, function(x) x[,'correlations']))))
+  bamstats.phi<-t(as.data.frame(do.call(rbind, lapply(bamstats, function(x) x[,'phi']))))
+  highlight<-ifelse(names(bamstats)==testsample,'hotpink','grey')
+  cat("\\begin{multicols}{2}")
+  boxplot(bamstats.cor, col=highlight)
+  title(main="Correlation")
+  #cat("\n\\columnbreak")
+  boxplot(bamstats.phi, col=highlight)
+  title(main="Dispersion")
+  cat("\\end{multicols}")
+  #cat("\\begin{quote}")
+  #cat("Excessive dispersion or a lack of overall correlation can indicate a failed sample")
+  #cat("\\end{quote}")
+}
 @
 
 <<table, size='footnotesize', results='asis', echo=FALSE, message=FALSE, fig.width=9, fig.height=4, out.width='1.0\\linewidth' >>=
 lowCoverageExons()
+cat("\\subsubsection*{Sample comparison}")
+plotRefsampleStats()
 cat(paste0('\\section{Sample ',gsub("_"," ",samplename),'}'))
 cat(paste0('\\textbf{Filename: }', gsub("_"," ",testsample)))
 correlationWarning(refsets[[samplename]])

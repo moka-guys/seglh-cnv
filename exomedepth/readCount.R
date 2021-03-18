@@ -58,12 +58,23 @@ suppressWarnings(counts <- getBamCounts(
 counts<-as(counts, 'data.frame')
 
 #
-# Generate sample correlation plot
+# Generate sample correlation/dispersion data
 #
-# -*- NotImplemented -*-
+
+pickreference<-function(testsample) {
+  refsamples<-bamnames[which(bamnames!=testsample)]
+  select.reference.set(
+    test.counts=counts[,testsample],
+    reference.counts=as.matrix(counts[,refsamples]),
+    bin.length=(counts$end - counts$start)
+  )$summary.stats
+}
+bamnames<-as.vector(sapply(bam,basename))
+bamstats<-lapply(bamnames, pickreference)
+names(bamstats)<-bamnames
 
 #
 # save read count table as Rdata
 # 
-save(list=c("counts","rois","bam"), file = args[1])
+save(list=c("counts","rois","bam","bamstats"), file = args[1])
 
