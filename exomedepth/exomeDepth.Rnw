@@ -213,7 +213,7 @@ plotRefsampleStats<-function() {
 
 <<table, size='footnotesize', results='asis', echo=FALSE, message=FALSE, fig.width=9, fig.height=4, out.width='1.0\\linewidth' >>=
 lowCoverageExons()
-cat("\\subsubsection*{Sample comparison}")
+cat("\\subsubsection*{Batch statistics}")
 plotRefsampleStats()
 cat(paste0('\\section{Sample ',gsub("_"," ",samplename),'}'))
 cat(paste0('\\textbf{Filename: }', gsub("_"," ",testsample)))
