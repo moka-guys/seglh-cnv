@@ -37,12 +37,11 @@ for (bamfile in bam) {
 }
 
 #
-# load/combine exon/ROI data, unique and set to 1-based
+# load/combine exon/ROI data and make unique
 #
 rois<-NULL
 for (tf in targetfiles) rois<-rbind(rois,read.table(tf,header=FALSE)[,1:4])
 rois<-unique(rois)
-rois[,2]<-rois[,2]+1
 colnames(rois)<-c('chromosome','start','end','name')
 
 #
@@ -58,9 +57,18 @@ suppressWarnings(counts <- getBamCounts(
 counts<-as(counts, 'data.frame')
 
 #
+# Calculate RPKM and batch statistics
+#
+calcRPKM<-function(c,l) c/(l*sum(c)/10^6)
+counts.len<-counts$end-counts$start+1
+rpkm<-apply(counts[,c(6:ncol(counts))],2,function(x) calcRPKM(x,counts.len))
+batch.cv<-apply(rpkm,2,function(r) sd(r)/mean(r)*100)
+batch.cor<-cor(rpkm)
+diag(batch.cor)<-NA
+
+#
 # Generate sample correlation/dispersion data
 #
-
 pickreference<-function(testsample) {
   refsamples<-bamnames[which(bamnames!=testsample)]
   select.reference.set(
@@ -74,7 +82,27 @@ bamstats<-lapply(bamnames, pickreference)
 names(bamstats)<-bamnames
 
 #
+# statistics output
+#
+stats<-data.frame()
+for (testsample in colnames(rpkm)) {
+    d<-cbind(
+             sample=testsample,
+             refsamples=which(bamstats[[testsample]]$selected),
+             bamstats[[testsample]][which(bamstats[[testsample]]$selected),
+                                    c('correlations','expected.BF','phi','RatioSd','mean.p','median.depth')],
+             batch.maxcor=max(batch.cor[testsample,],na.rm=TRUE),
+             batch.mediancor=median(batch.cor[testsample,],na.rm=TRUE),
+             coeff.var=batch.cv[testsample]
+            )
+    rownames(d)<-testsample
+    stats<-rbind(stats,d)
+}
+write.table(stats, file=sub("[.][^.]*$", ".csv", args[1], perl=TRUE), sep='\t', quote=FALSE, row.names=FALSE)
+
+#
 # save read count table as Rdata
 # 
-save(list=c("counts","rois","bam","bamstats"), file = args[1])
+save(list=c("counts","rois","bam","bamstats","batch.cv","batch.cor","rpkm","calcRPKM","stats"), 
+     file = args[1])
 

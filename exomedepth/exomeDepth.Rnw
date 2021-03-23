@@ -56,6 +56,13 @@ cat(paste(c("\\lhead{ExomeDepth ",pipeversion,"}"),collate="",sep=""))
 \\
 
 <<functions, echo=FALSE, message=FALSE>>=
+# LIMITS
+limit.medcor=0.90
+limits.cv<-c(25,30)
+limit.maxcor=0.98
+limit.refcor=0.97
+limit.refcount=3
+# FUNCTIONS
 summarizeGene<-function(exonstring) {
   if (is.na(exonstring)) return('Not in ROI')
   exons<-unlist(strsplit(exonstring, '[,]'))
@@ -63,7 +70,7 @@ summarizeGene<-function(exonstring) {
   genex<-vector()
   for (gene in genes) {
     e<-paste(sort(as.numeric(sapply(strsplit(exons[startsWith(exons,gene)],'_'),"[[",2))),collapse=",")
-    genex<-append(genex,paste(gene,' (Exon ',e,')',sep=""))
+    genex<-append(genex,paste(gene,' (',e,')',sep=""))
   }
   paste(genex,collapse=', ')
 }
@@ -71,31 +78,51 @@ not.na<-function(x) !is.na(x)
 CNVconfidence<-function(cnvs) {
   ifelse(cnvs$reads.expected<50 | (cnvs$reads.ratio>0.75 & cnvs$reads.ratio<1.25),"LOW","HIGH")
 }
-correlationWarning<-function(ref,limit.maxcor=0.98,limit.refcor=0.97,limit.refcount=3) {
-  counts.correlation<-cor(counts[,refsamplenames])
-  sample.correlation<-counts.correlation[ref$summary.stats$ref.samples,testsample]
+correlationWarning<-function(ref) {
+  batch.medcor<-median(batch.cor[testsample,],na.rm=T)
+  sample.cv<-batch.cv[testsample]
+  rpkm.correlation<-cor(rpkm[,refsamplenames])
+  sample.correlation<-rpkm.correlation[ref$summary.stats$ref.samples,testsample]
   max.correlation<-max(sample.correlation[sample.correlation!=1])
-  ref.correlation<-cor(cbind(counts[,testsample],reference.selected))[1,2]
+  ref.correlation<-cor(cbind(
+                             rpkm[,testsample],
+                             calcRPKM(reference.selected,(counts$end-counts$start+1))
+                             ))[1,2]
+  # decide on failures
+  fail.medcor<-batch.medcor<limit.medcor
+  fail.cv<-sample.cv>max(limits.cv)
   fail.maxcor<-max.correlation<limit.maxcor
   fail.refcor<-ref.correlation<limit.refcor
   fail.refcount<-length(ref$reference.choice)<limit.refcount
-  if (fail.maxcor | fail.refcor) {
+  if (fail.medcor | fail.cv | fail.maxcor | fail.refcor | fail.refcount) {
     cat("\\\\")
     cat("\\begin{warning}")
+    cat("\\subsection*{Warnings}")
+    if (fail.medcor) {
+      cat("\\paragraph*{BATCH CORRELATION}")
+      cat(paste0("The sample has low median RPKM correlation within the batch (",round(batch.medcor,3),"). "))
+      cat("This could indicate a failed sample.")
+    }
+    if (fail.cv) {
+      cat("\\paragraph*{HIGH VARIATION}")
+      cat(paste0("High coefficient of variation within sample (",round(sample.cv,1),"). "))
+      cat("This could indicate a failed sample.")
+    }
     if (fail.maxcor) {
-      cat("\\paragraph*{WARNING}")
-      cat(paste0("Highest sample correlation is below ",limit.maxcor,". "))
+      cat("\\paragraph*{MAXIMUM CORRELATION}")
+      cat(paste0("Highest read count correlation is below ",limit.maxcor,". "))
       cat("This could indicate a failed sample.")
     }
     if (fail.refcor) {
-      cat("\\paragraph*{WARNING}")
-      cat(paste0("Correlation between reference and tests count is ",round(ref.correlation,3),". "))
+      cat("\\paragraph*{REFERENCE CORRELATION}")
+      cat(paste0("Correlation with reference set normalised read count is ",round(ref.correlation,3),". "))
       cat(paste0("To get meaningful result, this correlation should really be above ",limit.refcor,". "))
-      cat("If this is not the case, consider the output of ExomeDepth as less reliable (i.e. most likely a high false positive rate).")
+      cat("If this is not the case, consider the output of ExomeDepth as less reliable (i.e. most likely a higher false positive rate).")
     }
     if (fail.refcount) {
-      cat("\\paragraph*{WARNING}")
+      cat("\\paragraph*{REFERENCE COUNT}")
       cat(paste0("Number of used reference samples is below ",limit.refcount,". "))
+      cat(paste0("This can limit CNV detection sensitivity if the reference contains the same alterations!"))
     }
     cat("\\end{warning}")
   }
@@ -105,13 +132,16 @@ sampleTable<-function(ref) {
   counts.correlation<-cor(counts[,refsamplenames])
   refsample.table<-cbind(
     ref$summary.stats,
-    correlationmax=apply(counts.correlation[ref$summary.stats$ref.samples,],1,function(x) x[x!=1]),
-    correlation=counts.correlation[ref$summary.stats$ref.samples,testsample],
-    selected.ref=sapply(ref$summary.stats$ref.samples%in%ref$reference.choice, function(x) ifelse(x,'Yes',''))
+    #correlationmax=apply(counts.correlation[ref$summary.stats$ref.samples,],1,function(x) x[x!=1]),
+    #correlation=counts.correlation[ref$summary.stats$ref.samples,testsample],
+    depth.median=c(ref$summary.stats$median.depth[1], diff(ref$summary.stats$median.depth)),
+    reference=sapply(ref$summary.stats$ref.samples%in%ref$reference.choice, function(x) ifelse(x,TRUE,FALSE))
   )
   cat("\\begin{scriptsize}")
-  print(kable(refsample.table[,c('expected.BF','RatioSd','median.depth','correlation','selected.ref')]))
+  print(kable(refsample.table[which(refsample.table$reference),c(
+    'expected.BF','phi','RatioSd','median.depth','correlations')]))
   cat("\\end{scriptsize}")
+  #cat("\n\\pagebreak")
 }
 lowCoverageExons<-function(pagerows=30) {
   if (nrow(coverage.table)>0) {
@@ -195,34 +225,48 @@ plotCNVs<-function(res, cnvs, extend=1000, fullgene=TRUE) {
   }
 }
 plotRefsampleStats<-function() {
-  bamstats.cor<-t(as.data.frame(do.call(rbind, lapply(bamstats, function(x) x[,'correlations']))))
-  bamstats.phi<-t(as.data.frame(do.call(rbind, lapply(bamstats, function(x) x[,'phi']))))
-  highlight<-ifelse(names(bamstats)==testsample,'hotpink','grey')
+  # plotting colours
+  highlight<-ifelse(colnames(batch.cor)==testsample,'hotpink','snow2')
+  bordercolour<-ifelse(colnames(batch.cor)==testsample,'black','snow4')
   cat("\\begin{multicols}{2}")
-  boxplot(bamstats.cor, col=highlight)
+  boxplot(batch.cor, xaxt="n", col=highlight, border=bordercolour)
+  abline(h=limit.medcor,col=c("red"),lty=2)
   title(main="Correlation")
-  #cat("\n\\columnbreak")
-  boxplot(bamstats.phi, col=highlight)
-  title(main="Dispersion")
+  # Coeff of variation
+  ymin<-min(c(limits.cv,batch.cv))
+  ymax<-max(c(limits.cv,batch.cv))
+  margin<-(ymax-ymin)*0.1
+  barplot(batch.cv, xaxt="n",ylim=c(ymin-margin,ymax+margin),xpd=FALSE,col=highlight,border=bordercolour)
+  box()
+  for (l in limits.cv) {
+    abline(h=l, col=ifelse(l==max(limits.cv),"red","chartreuse3"), lty=2)
+  }
+  title(main="Coefficient of variation")
+  # modeled overdispersion
+  #overdispersion<-unlist(lapply(bamstats,function(x) x$phi[which(x$selected)]))
+  #barplot(overdispersion, xaxt="n", col=highlight, border=bordercolour)
+  #box()
+  #title(main="Modeled overdispersion")
+  # END MULTICOLUMN
   cat("\\end{multicols}")
-  #cat("\\begin{quote}")
-  #cat("Excessive dispersion or a lack of overall correlation can indicate a failed sample")
-  #cat("\\end{quote}")
 }
 @
 
 <<table, size='footnotesize', results='asis', echo=FALSE, message=FALSE, fig.width=9, fig.height=4, out.width='1.0\\linewidth' >>=
+# plot lowCoverageExons
 lowCoverageExons()
+# plot batch stats
 cat("\\subsubsection*{Batch statistics}")
 plotRefsampleStats()
-cat(paste0('\\section{Sample ',gsub("_"," ",samplename),'}'))
+# sample results
+cat(paste0('\\section{',gsub("_"," ",samplename),'}'))
 cat(paste0('\\textbf{Filename: }', gsub("_"," ",testsample)))
 correlationWarning(refsets[[samplename]])
 if (suppressWarnings(is.na(results[[samplename]]))) {
   cat("\\textbf{NEED AT LEAST 2 REFERENCE SAMPLES TO RUN CNV ANALYSIS.}")
 } else {
   # PRINT REFERENCE SAMPLES
-  cat("\\subsection*{Reference samples}")
+  cat("\\subsection*{Reference sample choice}")
   sampleTable(refsets[[samplename]])
   # PRINT CNVs
   cat("\\subsection*{Called CNVs}")
