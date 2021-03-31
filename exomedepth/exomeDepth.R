@@ -23,16 +23,7 @@ cat(paste('Loading Packages\n'))
 require(warn.conflicts=FALSE,quietly=FALSE,package="GenomicRanges")
 require(warn.conflicts=FALSE,quietly=FALSE,package="ExomeDepth")
 require(warn.conflicts=FALSE,quietly=FALSE,package="knitr")
-
-#
-# DEFINE FUNCTIONS
-#
-selectReferenceSet<-function(df, test.sample, ref.samples, remove.test=TRUE) {
-    # remove self
-    if (remove.test) ref.samples<-ref.samples[which(ref.samples!=test.sample)]
-    # select best reference samples
-    select.reference.set(test.counts = df[,test.sample], reference.counts = as.matrix(df[,ref.samples]), bin.length = (df$end - df$start))
-}
+require(warn.conflicts=FALSE,quietly=FALSE,package="kableExtra")
 
 #
 # READ ARGS
@@ -55,6 +46,8 @@ if(is.na(threshold)) {
 }
 pipeversion<-args[1]
 load(args[4])  # loads counts,samplenames,rois (extended exons.hg19)
+normalisation.method<-ifelse(testsample%in%refsamplenames,'BATCH','PON')
+
 message(paste('        Version:',args[1]))
 message(paste('         Output:',args[2]))
 message(paste('            ROI:',panel[1]))
@@ -62,14 +55,15 @@ message(paste('     Panel Name:',panel[2]))
 message(paste('    Read Counts:',args[4]))
 message(paste('   Original BAM:',testsample))
 message(paste('     SampleName:',samplename))
-message(paste('    Ref samples:',length(bam)-1))
+message(paste('  Normalisation:',normalisation.method))
+message(paste('    Ref samples:',length(refsamplenames[which(testsample!=refsamplenames)])))
 
 #
 # run if enough samples
 #
-refsets<-list()
 results<-list()
-if (length(bam)>=3) {
+qc<-data.frame() ## to make sure qc table gets saved
+if (length(refsamplenames)>=3) {
   #
   # read exons/ROI and create subset
   #
@@ -80,15 +74,7 @@ if (length(bam)>=3) {
                   GRanges(seqnames = V1, IRanges(start=V2+1, end=V3, names=V4),names=V4))  # BED FILE 0-based
   coveredexons<-subsetByOverlaps(exons,covered)
   ce<-data.frame(seqnames=seqnames(coveredexons), starts=start(coveredexons)-1, ends=end(coveredexons), name=mcols(coveredexons)$names)
-
-  #
-  # run exomedepth
-  #
-  # select normal samples (if 3+ specified)
-  message('Selecting Normals (if any starting with NNN)...')
-  refsamplenames<-as.vector(sapply(bam,basename))
-  normals<-which(unlist(lapply(refsamplenames,function(x) substr(x,1,3)))=='NNN')
-  if (length(normals)>2) refsamplenames<-refsamplenames[normals]
+  selected.genes<-unique(sapply(strsplit(ce$name,'_'),function(x) x[1]))
 
   #
   # Define low coverage exons
@@ -104,19 +90,12 @@ if (length(bam)>=3) {
   coverage.table<-coverage.df[which(coverage.df$coverage.median<limit.coverage & coverage.df$exon%in%exonnames),]
 
   #
-  # get dispersion and correlation metrics
-  #
-  #refsamplestats<-lapply(refsamplenames, function(testsample) selectReferenceSet(counts, testsample, refsamplenames, TRUE)$summary.stats)
-  #names(refsamplestats)<-refsamplenames
-
-  # estimate reference set
-  refsets[[samplename]]<-selectReferenceSet(counts, testsample, refsamplenames, TRUE)
-  #
   # run exome depth
   #
   # prepare reference (sum reference choice)
-  reference.selected<-apply(X = as.matrix(counts[, refsets[[samplename]]$reference.choice, drop = FALSE]),
-                            MAR = 1, FUN = sum)
+  reference.selected<-apply(X = as.matrix(counts[, refsets[[testsample]]$reference.choice, drop = FALSE]),
+                            MAR = 1,
+                            FUN = sum)
   reference.selected<-as.vector(reference.selected)
   # create ED object
   message('*** Creating ExomeDepth object...')
@@ -124,9 +103,8 @@ if (length(bam)>=3) {
                              test = counts[,testsample],
                              reference = reference.selected,
                              formula = 'cbind(test, reference) ~ 1'))
-  message('==========')
   # call CNV
-  message('Calling CNVs...')
+  message('*** Calling CNVs...')
   result<-CallCNVs(x = ED,
                    transition.probability = threshold,
                    chromosome = counts$chromosome,
@@ -135,7 +113,7 @@ if (length(bam)>=3) {
                    name = counts$exon)
 
   # annotate results
-  print(paste('raw CNV count:',length(result@CNV.calls)))
+  print(paste('Raw CNV count:',length(result@CNV.calls)))
 
   # 
   message('Annotating CNVs...')
@@ -144,17 +122,17 @@ if (length(bam)>=3) {
     result.annotated<-AnnotateExtra(x = result, reference.annotation = coveredexons,
       min.overlap = 0.0001, column.name = 'exons.hg19')
     result.annotated@annotations$name<-as.factor(sapply(strsplit(as.character(result.annotated@annotations$name),'_'),"[[",1))
-    results[[samplename]]<-result.annotated
+    results[[testsample]]<-result.annotated
     # write BED file of CNVs (is 1-based but irrelevant as only for visualisation)
-    write.table(results[[samplename]]@CNV.calls[which(results[[samplename]]@CNV.calls[,9]>0),c(7,5,6,3,9)], file=sub("[.][^.]*$", ".bed", args[2], perl=TRUE), sep='\t', col.names=FALSE, quote=FALSE, row.names=FALSE)
+    write.table(results[[testsample]]@CNV.calls[which(results[[testsample]]@CNV.calls[,9]>0),c(7,5,6,3,9)], file=sub("[.][^.]*$", ".bed", args[2], perl=TRUE), sep='\t', col.names=FALSE, quote=FALSE, row.names=FALSE)
   } else {
     # no results, empty bed file
-    results[[samplename]]<-FALSE  # no CNVs called
+    results[[testsample]]<-FALSE  # no CNVs called
     write.table(NULL, file=sub("[.][^.]*$", ".bed", args[2], perl=TRUE), sep='\t', quote=FALSE)
   }
 } else {
   message('Skipping ExomeDepth (not enough reference samples)...')
-  results[[samplename]]<-NA
+  results[[testsample]]<-NA
   #
   # write BED file of CNVs (is 1-based but irrelevant as only for visualisation)
   #
@@ -164,7 +142,6 @@ if (length(bam)>=3) {
 # knit report (using refsets, results)
 #
 knitrScript<-paste(scriptDirectory, 'exomeDepth.Rnw', sep='/')
-print(knitrScript)
 if (sub(".*[.]","",args[2],perl=TRUE)=="pdf") {
   knit2pdf(knitrScript, output=sub("[.][^.]*$", ".tex", args[2], perl=TRUE))
 }

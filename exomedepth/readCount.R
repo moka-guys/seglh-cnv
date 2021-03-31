@@ -57,39 +57,59 @@ suppressWarnings(counts <- getBamCounts(
 counts<-as(counts, 'data.frame')
 
 #
-# Calculate RPKM and batch statistics
+# Calculate RPKM
 #
 calcRPKM<-function(c,l) c/(l*sum(c)/10^6)
 counts.len<-counts$end-counts$start+1
 rpkm<-apply(counts[,c(6:ncol(counts))],2,function(x) calcRPKM(x,counts.len))
+
+#
+# Calculate batch statistics (all samples and normals if any)
+#
 batch.cv<-apply(rpkm,2,function(r) sd(r)/mean(r)*100)
 batch.cor<-cor(rpkm)
 diag(batch.cor)<-NA
 
 #
-# Generate sample correlation/dispersion data
+# select normal samples (if 3+ specified)
 #
-pickreference<-function(testsample) {
-  refsamples<-bamnames[which(bamnames!=testsample)]
+refsamplenames<-as.vector(sapply(bam,basename))
+testsamplenames<-refsamplenames
+# NORMAL selection
+normalprefix<-'NORMAL'
+normals<-which(unlist(lapply(refsamplenames,function(x) substr(x,1,length(normalprefix)))) == normalprefix)
+tests<-which(unlist(lapply(testsamplenames,function(x) substr(x,1,length(normalprefix)))) != normalprefix)
+if (length(normals)>2) {
+    message("Will use Panel of Normals...")
+    refsamplenames<-refsamplenames[normals]
+    testsamplenames<-testsamplenames[tests]
+} else {
+    message('Will use intra-batch normalisation...')
+}
+
+#
+# Pick reference sample set
+#
+selectReferenceSet<-function(testsample) {
+  refsamples<-refsamplenames[which(refsamplenames!=testsample)]
   select.reference.set(
     test.counts=counts[,testsample],
     reference.counts=as.matrix(counts[,refsamples]),
     bin.length=(counts$end - counts$start)
-  )$summary.stats
+  )
 }
-bamnames<-as.vector(sapply(bam,basename))
-bamstats<-lapply(bamnames, pickreference)
-names(bamstats)<-bamnames
+refsets<-lapply(testsamplenames, selectReferenceSet)
+names(refsets)<-testsamplenames
 
 #
 # statistics output
 #
 stats<-data.frame()
-for (testsample in colnames(rpkm)) {
+for (testsample in testsamplenames) {
     d<-cbind(
              sample=testsample,
-             refsamples=which(bamstats[[testsample]]$selected),
-             bamstats[[testsample]][which(bamstats[[testsample]]$selected),
+             refsamples=which(refsets[[testsample]]$summary.stats$selected),
+             refsets[[testsample]]$summary.stats[which(refsets[[testsample]]$summary.stats$selected),
                                     c('correlations','expected.BF','phi','RatioSd','mean.p','median.depth')],
              batch.maxcor=max(batch.cor[testsample,],na.rm=TRUE),
              batch.mediancor=median(batch.cor[testsample,],na.rm=TRUE),
@@ -103,6 +123,16 @@ write.table(stats, file=sub("[.][^.]*$", ".csv", args[1], perl=TRUE), sep='\t', 
 #
 # save read count table as Rdata
 # 
-save(list=c("counts","rois","bam","bamstats","batch.cv","batch.cor","rpkm","calcRPKM","stats"), 
+
+save(list=c(
+            "refsamplenames",  # selected reference samples (normals if provided)
+            "counts",          # all read counts
+            "rois",            # regions of interest (full)
+            "batch.cv",        # Coefficient of Variation for each sample in batch
+            "batch.cor",       # Correlation within batch
+            "refsets",         # picked reference sets
+            "rpkm",            # RPKM calculation
+            "calcRPKM",        # function to calculate RPKM
+            "stats"),          # model and betch statistics
      file = args[1])
 
