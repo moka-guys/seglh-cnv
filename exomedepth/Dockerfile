@@ -29,15 +29,18 @@ RUN tlmgr install framed && \
 	tlmgr install mdframed && \
 	tlmgr install zref && \
 	tlmgr install needspace && \
-	tlmgr install dingbat
+	tlmgr install dingbat && \
+	tlmgr install xcolor
 
 # R dependencies
 RUN Rscript -e "install.packages('BiocManager');BiocManager::install(version = '3.12')" && \
 	Rscript -e "BiocManager::install(c('Biostrings','IRanges','Rsamtools','GenomicRanges','GenomicAlignments'))" && \
 	Rscript -e "install.packages('optparse')" && \
+	Rscript -e "install.packages('randomForest')" && \
 	Rscript -e "install.packages('ExomeDepth')" && \
 	Rscript -e "install.packages('plyr')" && \
 	Rscript -e "install.packages('knitr')" && \
+	Rscript -e "install.packages('kableExtra')" && \
 	Rscript -e "install.packages('tinytex')"
 
 # add exomedepth scripts and report template
