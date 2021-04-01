@@ -55,6 +55,8 @@ limits<-list(
   refcount=c(5,3),       # refernce set size (selected reference samples)
   coeffvar=c(30, 35)        # coefficient of variation
 )
+# coverage limitation warning
+limit.coverage<-100
 
 # save model
 save(list=c("rfc"), file=args[1])

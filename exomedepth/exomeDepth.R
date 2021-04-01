@@ -78,9 +78,22 @@ if (length(refsamplenames)>=3) {
   selected.genes<-unique(sapply(strsplit(ce$name,'_'),function(x) x[1]))
 
   #
-  # Define low coverage exons
+  # set defaults and load QC limits (override)
   #
   limit.coverage<-100
+  limits<-list(
+    medcor=c(NA, 0.90),   # median correlation within batch
+    maxcor=c(0.95, 0.90), # max correlation within batch
+    refcor=c(0.95, 0.90), # reference set correlation
+    refcount=c(5,3),      # refernce set size (selected reference samples)
+    coeffvar=c(30, 35)    # coefficient of variation
+  )
+  predicted_qc<-NA
+  if (!is.na(args[6])) load(args[6])
+
+  #
+  # Define low coverage exons
+  #
   exonnames<-coveredexons@elementMetadata@listData$names
   coverage.df<-data.frame(
     exon=counts$exon,
@@ -101,18 +114,7 @@ if (length(refsamplenames)>=3) {
   #
   # Build QC table and predict Quality outcome of classifier provided
   #
-  limits<-list(
-    medcor=c(NA, 0.90),   # median correlation within batch
-    maxcor=c(0.95, 0.90), # max correlation within batch
-    refcor=c(0.95, 0.90), # reference set correlation
-    refcount=c(5,3),      # refernce set size (selected reference samples)
-    coeffvar=c(30, 35)    # coefficient of variation
-  )
-  predicted_qc<-NA
   if (!is.na(args[6])) {
-    # load QC classifier
-    # NB: NEW LIMITS CAN BE INJECTED HERE
-    load(args[6])
     predicted_qc<-predict(rfc,stats[testsample,2:ncol(stats)])
   }
   # build QC table
