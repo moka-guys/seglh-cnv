@@ -30,6 +30,7 @@ RUN tlmgr install framed && \
 	tlmgr install zref && \
 	tlmgr install needspace && \
 	tlmgr install dingbat && \
+	tlmgr install booktabs && \
 	tlmgr install xcolor
 
 # R dependencies
