@@ -31,15 +31,30 @@ ed<-ed[which(!is.na(ed$status)),]
 ed$status<-as.factor(ed$status)
 
 # build classifier and return error rate
-rfc<-randomForest(status~., data=ed, ntree=200, mtry=3, importance=TRUE)
+variables<-ncol(ed)-1
+oob.err<-double(variables)
+for (mtry in 1:variables) {
+  rf<-randomForest(status~., data=ed, ntree=200, mtry=mtry, importance=TRUE)
+  oob.err[mtry]=rf$err.rate[nrow(rf$err.rate),"OOB"]
+}
+
+# pick best classifier
+best.mtry<-which(min(oob.err)==oob.err)
+print(paste("MTRY",best.mtry))
+rfc<-randomForest(status~., data=ed, ntree=200, mtry=best.mtry, importance=TRUE)
 
 # show result
 importance(rfc)
 print(rfc)
 
-
-# define 
-
+# define (override) QC thresholds
+limits<-list(
+  medcor=c(NA, 0.90),   # median correlation within batch
+  maxcor=c(0.95, 0.90), # max correlation within batch
+  refcor=c(0.95, 0.90), # reference set correlation
+  refcount=c(5,3),       # refernce set size (selected reference samples)
+  coeffvar=c(30, 35)        # coefficient of variation
+)
 
 # save model
 save(list=c("rfc"), file=args[1])
