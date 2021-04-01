@@ -37,6 +37,23 @@ for (bamfile in bam) {
 }
 
 #
+# select normal samples (if 3+ specified)
+#
+refsamplenames<-as.vector(sapply(bam,basename))
+testsamplenames<-refsamplenames
+# NORMAL selection
+normalprefix<-'NORMAL'
+normals<-which(substr(refsamplenames,1,nchar(normalprefix)) == normalprefix)
+tests<-which(substr(testsamplenames,1,nchar(normalprefix)) != normalprefix)
+if (length(normals)>2) {
+    message("Will use Panel of Normals...")
+    refsamplenames<-refsamplenames[normals]
+    testsamplenames<-testsamplenames[tests]
+} else {
+    message('Will use intra-batch normalisation...')
+}
+
+#
 # load/combine exon/ROI data and make unique
 #
 rois<-NULL
@@ -69,23 +86,6 @@ rpkm<-apply(counts[,c(6:ncol(counts))],2,function(x) calcRPKM(x,counts.len))
 batch.cv<-apply(rpkm,2,function(r) sd(r)/mean(r)*100)
 batch.cor<-cor(rpkm)
 diag(batch.cor)<-NA
-
-#
-# select normal samples (if 3+ specified)
-#
-refsamplenames<-as.vector(sapply(bam,basename))
-testsamplenames<-refsamplenames
-# NORMAL selection
-normalprefix<-'NORMAL'
-normals<-which(unlist(lapply(refsamplenames,function(x) substr(x,1,length(normalprefix)))) == normalprefix)
-tests<-which(unlist(lapply(testsamplenames,function(x) substr(x,1,length(normalprefix)))) != normalprefix)
-if (length(normals)>2) {
-    message("Will use Panel of Normals...")
-    refsamplenames<-refsamplenames[normals]
-    testsamplenames<-testsamplenames[tests]
-} else {
-    message('Will use intra-batch normalisation...')
-}
 
 #
 # Pick reference sample set

@@ -52,10 +52,11 @@ cat(paste(c("\\lhead{ExomeDepth ",pipeversion,"}"),collate="",sep=""))
 % DOCUMENT
 \begin{document}
 \maketitle
-\textbf{Panel:} \Sexpr{gsub("_"," ",panel[2])} \\
-\textbf{Targets:} \Sexpr{gsub("_"," ",panel[1])} \\
-\textbf{Exons:} \Sexpr{gsub("_"," ",length(coveredexons@ranges))} \\
+\textbf{Panel:} \Sexpr{gsub("_"," ",panel[2])}
+(\Sexpr{gsub("_"," ",panel[1])}) \\
 \textbf{Genes:} \Sexpr{paste(selected.genes,collapse="")}
+(\Sexpr{gsub("_"," ",length(coveredexons@ranges))} exons) \\
+\textbf{Normalisation method:} \Sexpr{paste(normalisation.method)}
 \\
 
 <<functions, echo=FALSE, message=FALSE>>=
