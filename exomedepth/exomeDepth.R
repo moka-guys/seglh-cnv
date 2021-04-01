@@ -24,6 +24,7 @@ require(warn.conflicts=FALSE,quietly=FALSE,package="GenomicRanges")
 require(warn.conflicts=FALSE,quietly=FALSE,package="ExomeDepth")
 require(warn.conflicts=FALSE,quietly=FALSE,package="knitr")
 require(warn.conflicts=FALSE,quietly=FALSE,package="kableExtra")
+require(warn.conflicts=FALSE,quietly=FALSE,package="randomForest")
 
 #
 # READ ARGS
@@ -90,14 +91,66 @@ if (length(refsamplenames)>=3) {
   coverage.table<-coverage.df[which(coverage.df$coverage.median<limit.coverage & coverage.df$exon%in%exonnames),]
 
   #
-  # run exome depth
-  #
   # prepare reference (sum reference choice)
+  #
   reference.selected<-apply(X = as.matrix(counts[, refsets[[testsample]]$reference.choice, drop = FALSE]),
                             MAR = 1,
                             FUN = sum)
   reference.selected<-as.vector(reference.selected)
-  # create ED object
+
+  #
+  # Build QC table and predict Quality outcome of classifier provided
+  #
+  limits<-list(
+    medcor=c(NA, 0.90),   # median correlation within batch
+    maxcor=c(0.95, 0.90), # max correlation within batch
+    refcor=c(0.95, 0.90), # reference set correlation
+    refcount=c(5,3),      # refernce set size (selected reference samples)
+    coeffvar=c(30, 35)    # coefficient of variation
+  )
+  predicted_qc<-NA
+  if (!is.na(args[6])) {
+    # load QC classifier
+    # NB: NEW LIMITS CAN BE INJECTED HERE
+    load(args[6])
+    predicted_qc<-predict(rfc,stats[testsample,2:ncol(stats)])
+  }
+  # build QC table
+  ref.correlation<-cor(cbind(rpkm[,testsample],calcRPKM(reference.selected,(counts$end-counts$start+1))))[1,2]
+  # decide on failures
+  decide<-function(v,t) {
+    cmp<-ifelse(any(is.na(t)) || t[1]>t[2], function(m,n) m>=n, function(m,n) m<n)
+    threshold<-ifelse(any(is.na(t)) || t[1]>t[2],"equal or greater than","less than" )
+    status<-ifelse(!is.na(t[2]) && !cmp(v,t[2]),"FAIL",
+                ifelse(!is.na(t[1]) && !cmp(v,t[1]),"CAUTION","PASS"))
+    list(
+          value=round(v,3),
+          threshold=threshold,
+          soft=t[1],
+          hard=t[2],
+          status=status
+    )
+  }
+
+  qc<-rbind(
+    decide(stats[testsample,"batch.mediancor"],limits$medcor),
+    decide(stats[testsample,"batch.maxcor"],limits$maxcor),
+    decide(stats[testsample,"coeff.var"],limits$coeffvar),
+    decide(ref.correlation, limits$refcor),
+    decide(length(refsets[[testsample]]$reference.choice),limits$refcount)
+  )
+  rownames(qc)=c(
+            "Median correlation in batch",
+            "Maximum correlation in batch",
+            "Coefficient of variation",
+            "Correlation with reference",
+            "Size of reference set"
+  )
+  qc<-as.data.frame(qc)
+
+  #
+  # run exome depth
+  #
   message('*** Creating ExomeDepth object...')
   suppressWarnings(ED <- new('ExomeDepth',
                              test = counts[,testsample],
@@ -114,8 +167,6 @@ if (length(refsamplenames)>=3) {
 
   # annotate results
   print(paste('Raw CNV count:',length(result@CNV.calls)))
-
-  # 
   message('Annotating CNVs...')
   if (length(result@CNV.calls)>0) {
     # add exon numbers (from subset)
@@ -138,6 +189,7 @@ if (length(refsamplenames)>=3) {
   #
   write.table(NULL, file=sub("[.][^.]*$", ".bed", args[2], perl=TRUE), sep='\t', quote=FALSE)
 }
+
 #
 # knit report (using refsets, results)
 #

@@ -5,6 +5,7 @@
 \usepackage{multicol}
 \usepackage{mdframed}
 \usepackage{dingbat}
+\usepackage{booktabs}
 \usepackage[table]{xcolor}
 \setlength{\columnsep}{0cm}
 
@@ -22,7 +23,7 @@
 \makeatletter
 \renewcommand{\maketitle}{\bgroup\setlength{\parindent}{0pt}
 \begin{flushleft}
-  \textbf{\large{\@title}}
+  \textbf{\Large{\@title}}
 
   \@author
 \end{flushleft}\egroup
@@ -57,17 +58,6 @@ cat(paste(c("\\lhead{ExomeDepth ",pipeversion,"}"),collate="",sep=""))
 \textbf{Genes:} \Sexpr{paste(selected.genes,collapse="")}
 \\
 
-<<defaults, echo=FALSE, message=FALSE>>=
-# limits c(soft,hard)
-limits<-list(
-  medcor=c(NA, 0.90),   # median correlation within batch
-  maxcor=c(0.95, 0.90), # max correlation within batch
-  refcor=c(0.95, 0.90), # reference set correlation
-  refcount=c(5,3),       # refernce set size (selected reference samples)
-  coeffvar=c(30, 35)        # coefficient of variation
-)
-@
-
 <<functions, echo=FALSE, message=FALSE>>=
 # FUNCTIONS
 summarizeGene<-function(exonstring) {
@@ -85,85 +75,56 @@ not.na<-function(x) !is.na(x)
 CNVconfidence<-function(cnvs) {
   ifelse(cnvs$reads.expected<50 | (cnvs$reads.ratio>0.75 & cnvs$reads.ratio<1.25),"LOW","HIGH")
 }
-qcTable<-function(ref) {
-  predicted_qc<-NA
-  if (!is.na(args[6])) {
-    # load QC classifier
-    # NB: NEW LIMITS CAN BE INJECTED HERE
-    load(args[6])
-    predicted_qc<-predict(rfc,stats[testsample,2:ncol(stats)])
-  }
-  # build QC table
-  ref.correlation<-cor(cbind(rpkm[,testsample],calcRPKM(reference.selected,(counts$end-counts$start+1))))[1,2]
-  # decide on failures
-  decide<-function(v,t) {
-    cmp<-ifelse(any(is.na(t)) || t[1]>t[2], function(m,n) m>=n, function(m,n) m<n)
-    threshold<-ifelse(any(is.na(t)) || t[1]>t[2],"equal or greater than","less than" )
-    status<-ifelse(!is.na(t[2]) && !cmp(v,t[2]),"FAIL",
-                ifelse(!is.na(t[1]) && !cmp(v,t[1]),"CAUTION","PASS"))
-    list(
-         value=round(v,3),
-         threshold=threshold,
-         soft=t[1],
-         hard=t[2],
-         status=status
-    )
+qcTable<-function() {
+  if (!is.na(predicted_qc)) {
+    oob.error<-rfc$err.rate[nrow(rfc$err.rate),"OOB"]
+    cat("\\begin{center}")
+    cat(paste("Random forest classifier predicts",
+      as.character(predicted_qc),
+      "at",
+      round(oob.error,3)*100,
+      "percent out-of-bag error rate"))
+    cat("\\end{center}")
   }
 
-  qc<-rbind(
-    decide(stats[testsample,"batch.mediancor"],limits$medcor),
-    decide(stats[testsample,"batch.maxcor"],limits$maxcor),
-    decide(stats[testsample,"coeff.var"],limits$coeffvar),
-    decide(ref.correlation, limits$refcor),
-    decide(length(ref$reference.choice),limits$refcount)
-  )
-  rownames(qc)=c(
-           "Median correlation in batch",
-           "Maximum correlation in batch",
-           "Coefficient of variation",
-           "Correlation with reference",
-           "Size of reference set"
-  )
+  # build footnote (explanations)
+  footnotes<-c("No warnings issued. QC passed.")
+  ftitle<-""
+  if (any(qc$status!="PASS")) {
+    footnotes<-vector()
+    ftitle<-"Warning:"
+    failed<-which(qc$status!="PASS")
+    if (1%in%failed || 2%in%failed) {
+      footnotes<-append(footnotes,
+        "The sample has a low RPKM correlation within the batch which likely indicates a failed sample.")
+    }
+    if (3%in%failed) {
+      footnotes<-append(footnotes,
+        "High coefficient of variation within sample (scatter).")
+    }
+    if (4%in%failed) {
+      footnotes<-append(footnotes,
+        "Expect a higher false positive rate and reduced sensitivity due to low correlation with reference set.")
+    }
+    if (5%in%failed) {
+      footnotes<-append(footnotes,
+        "The low number of reference samples could limit assay sensitivity if they contain the same alterations!")
+    }
+  }
   print(
-    kbl(qc,escape=T) %>%
-    kable_styling(latex_options = "hold_position") %>%
+    kbl(qc,escape=T,booktabs=T) %>%
+    kable_styling(latex_options = "hold_position", font_size=7) %>%
     row_spec(which(qc$status=="FAIL"), bold = T, color = "white", background = "red") %>%
     row_spec(which(qc$status=="PASS"), background = "green") %>%
-    row_spec(which(qc$status=="CAUTION"), color = "white", background = "orange")
-  )
+    row_spec(which(qc$status=="CAUTION"), color = "white", background = "orange") %>%
+    footnote(general=paste(footnotes), general_title=ftitle)
+  )  
 
-#  if (fail.medcor | fail.cv | fail.maxcor | fail.refcor | fail.refcount) {
-#    cat("\\\\")
-#    cat("\\begin{warning}")
-#    cat("\\subsection*{Warnings}")
-#    if (fail.medcor) {
-#      cat("\\paragraph*{BATCH CORRELATION}")
-#      cat(paste0("The sample has low median RPKM correlation within the batch (",round(batch.medcor,3),"). "))
-#      cat("This could indicate a failed sample.")
-#    }
-#    if (fail.cv) {
-#      cat("\\paragraph*{HIGH VARIATION}")
-#      cat(paste0("High coefficient of variation within sample (",round(sample.cv,1),"). "))
-#      cat("This could indicate a failed sample.")
-#    }
-#    if (fail.maxcor) {
-#      cat("\\paragraph*{MAXIMUM CORRELATION}")
-#      cat(paste0("Highest read count correlation is below ",limit.maxcor,". "))
-#      cat("This could indicate a failed sample.")
-#    }
-#    if (fail.refcor) {
-#      cat("\\paragraph*{REFERENCE CORRELATION}")
-#      cat(paste0("Correlation with reference set normalised read count is ",round(ref.correlation,3),". "))
-#      cat(paste0("To get meaningful result, this correlation should really be above ",limit.refcor,". "))
-#      cat("If this is not the case, consider the output of ExomeDepth as less reliable (i.e. most likely a higher false positive rate).")
-#    }
-#    if (fail.refcount) {
-#      cat("\\paragraph*{REFERENCE COUNT}")
-#      cat(paste0("Number of used reference samples is below ",limit.refcount,". "))
-#      cat(paste0("This can limit CNV detection sensitivity if the reference contains the same alterations!"))
-#    }
-#    cat("\\end{warning}")
-#  }
+  ##### reorder tables in report
+  ##### update build scripts and dependencies
+  ##### rebuild and publish
+  ##### notify (keep CSV)
+  ##### Build predictor
 
 }
 sampleTable<-function(ref) {
@@ -178,7 +139,7 @@ sampleTable<-function(ref) {
   )
   cat("\\begin{scriptsize}")
   print(kbl(refsample.table[which(refsample.table$reference),c(
-    'expected.BF','phi','RatioSd','median.depth','correlations')]))
+    'expected.BF','phi','RatioSd','median.depth','correlations')], booktabs=TRUE))
   cat("\\end{scriptsize}")
   #cat("\n\\pagebreak")
 }
@@ -191,35 +152,23 @@ lowCoverageExons<-function(pagerows=30) {
     for (i in 1:subtables) {
       startrow<-((i-1)*pagerows)+1
       endrow<-min(nrow(coverage.table), i*pagerows)
-      print(kable(coverage.table[startrow:endrow,], row.names=FALSE, format='latex'))
+      print(kbl(coverage.table[startrow:endrow,], row.names=FALSE, format='latex', booktabs=TRUE))
     }
     cat("\\end{scriptsize}")
     cat("\\end{warning}")
   }
 }
-paginatedCNVtable<-function(cnvtable, pagerows = 60) {
-  subtables<-ceiling(nrow(cnvtable)/pagerows)
-  for (i in 1:subtables) {
-    startrow<-((i-1)*pagerows)+1
-    endrow<-min(nrow(cnvtable), i*pagerows)
-    cat("\\begin{scriptsize}")
-    print(kable(cnvtable[startrow:endrow,], row.names=FALSE, format='latex'))
-    cat("\\end{scriptsize}")
-    cat("\\\\")
-    cat("\\begin{tiny}")
-    cat(paste("\\textbf{Table ",i,"/",subtables,'  }',sep=""))
-    cat("\\textit{CNVs with negative bayes factors have been omitted.}")
-    cat("\\end{tiny}")
-    if (i!=subtables) {
-      cat('\n\\newpage')
-    }
-  }
-  #cat("\\subparagraph{Bayes Factor}")
-  cat("\\begin{quote}")
-  cat("The Bayes Factor (BF) is a measure of strength of evidence of the alternate hypothesis (copy number change) over the null hypothesis (no alteration). ")
-  cat("The following evidence levels were suggested by Lee and Wagenmakers (2013): ")
-  cat("1 (no evidence), 1-3 (anecdotal), 3-10 (moderate), 10-30 (strong), 30-100 (very strong), over 100 (extreme). ")
-  cat("\\end{quote}")
+CNVtable<-function(cnvtable) {
+  footnotes=c("The Bayes Factor (BF) is a measure of strength of evidence of the alternate hypothesis (copy number change)",
+    "over the null hypothesis (no alteration). CNVs with negative Bayes Factor were omitted.",
+    "The following evidence levels were suggested by Lee and Wagenmakers (2013):",
+    "1 (no evidence), 1-3 (anecdotal), 3-10 (moderate), 10-30 (strong), 30-100 (very strong), over 100 (extreme).")
+  cat("\\begin{scriptsize}")
+  print(
+    kbl(cnvtable, row.names=FALSE, format='latex', booktabs=TRUE) %>%
+    footnote(general=paste(footnotes), general_title="")
+  )
+  cat("\\end{scriptsize}")
 }
 plotCNVs<-function(res, cnvs, extend=1000, fullgene=TRUE) {
   # reorder and remove BF<0
@@ -270,7 +219,7 @@ plotRefsampleStats<-function() {
   cat("\\begin{multicols}{2}")
   boxplot(batch.cor, xaxt="n", col=highlight, border=bordercolour)
   abline(h=limits$medcor[2],col=c("red"),lty=2)
-  title(main="Correlation")
+  title(main="Correlation within batch")
   # Coeff of variation
   ymin<-min(c(limits$cv,batch.cv))
   ymax<-max(c(limits$cv,batch.cv))
@@ -290,18 +239,17 @@ plotRefsampleStats<-function() {
 # plot lowCoverageExons
 lowCoverageExons()
 # plot batch stats
-cat("\\subsubsection*{Batch statistics}")
+cat("\\subsubsection*{Quality Control}")
+qcTable()
 plotRefsampleStats()
 # sample results
 cat(paste0('\\section{',gsub("_"," ",samplename),'}'))
 cat(paste0('\\textbf{Filename: }', gsub("_"," ",testsample)))
-cat("\\subsection*{Quality Control}")
-qcTable(refsets[[testsample]])
 if (suppressWarnings(is.na(results[[testsample]]))) {
   cat("\\textbf{NEED AT LEAST 2 REFERENCE SAMPLES TO RUN CNV ANALYSIS.}")
 } else {
   # PRINT REFERENCE SAMPLES
-  cat("\\subsection*{Reference sample choice}")
+  cat("\\subsubsection*{Reference sample choice}")
   sampleTable(refsets[[testsample]])
   # PRINT CNVs
   cat("\\subsection*{Called CNVs}")
@@ -319,7 +267,7 @@ if (suppressWarnings(is.na(results[[testsample]]))) {
     cnvs[,'confidence']<-CNVconfidence(cnvs)
     if (!!nrow(cnvs)) {
       cnvtable<-cnvs[which(cnvs$BF>0),c('id','BF','reads.expected','reads.ratio','type','genes','confidence')]
-      paginatedCNVtable(cnvtable,60)
+      CNVtable(cnvtable)
       #cat("\\begin{verse}Coverage plots on following page.\\end{verse}")
       #cat('\n\\newpage')
       cat("\\subsubsection*{Coverage plots}")
@@ -335,7 +283,7 @@ if (suppressWarnings(is.na(results[[testsample]]))) {
 }
 #cat("\\\\")
 #cat("\\begin{center}")
-#cat("\\textit{--- END OF REPORT ---}")
+# cat("\\textit{--- END OF REPORT ---}")
 #cat("\\end{center}")
 @
 
