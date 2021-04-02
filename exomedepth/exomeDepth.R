@@ -25,6 +25,8 @@ require(warn.conflicts=FALSE,quietly=FALSE,package="ExomeDepth")
 require(warn.conflicts=FALSE,quietly=FALSE,package="knitr")
 require(warn.conflicts=FALSE,quietly=FALSE,package="kableExtra")
 require(warn.conflicts=FALSE,quietly=FALSE,package="randomForest")
+require(warn.conflicts=FALSE,quietly=FALSE,package="Rsamtools")
+source('ed2vcf.R')
 
 #
 # READ ARGS
@@ -176,20 +178,21 @@ if (length(refsamplenames)>=3) {
       min.overlap = 0.0001, column.name = 'exons.hg19')
     result.annotated@annotations$name<-as.factor(sapply(strsplit(as.character(result.annotated@annotations$name),'_'),"[[",1))
     results[[testsample]]<-result.annotated
-    # write BED file of CNVs (is 1-based but irrelevant as only for visualisation)
-    write.table(results[[testsample]]@CNV.calls[which(results[[testsample]]@CNV.calls[,9]>0),c(7,5,6,3,9)], file=sub("[.][^.]*$", ".bed", args[2], perl=TRUE), sep='\t', col.names=FALSE, quote=FALSE, row.names=FALSE)
+    # write BED file of CNVs
+    bed.data<-results[[testsample]]@CNV.calls[which(results[[testsample]]@CNV.calls[,9]>0),c(7,5,6,3,9)]
+    bed.data[,2]<-bed.data[,2]-1
+    write.table(bed.data, file=sub("[.][^.]*$", ".bed", args[2], perl=TRUE), sep='\t', col.names=FALSE, quote=FALSE, row.names=FALSE)
+    # write VCF file
+    ed2vcf(results[[testsample]], sub("[.][^.]*$",".vcf",args[2],perl=TRUE), referenceFasta, rois, samplename)
   } else {
-    # no results, empty bed file
+    # no results, empty BED and VCF files
     results[[testsample]]<-FALSE  # no CNVs called
     write.table(NULL, file=sub("[.][^.]*$", ".bed", args[2], perl=TRUE), sep='\t', quote=FALSE)
+    ed2vcf(NULL, sub("[.][^.]*$",".vcf",args[2],perl=TRUE), referenceFasta, rois, samplename)
   }
 } else {
   message('Skipping ExomeDepth (not enough reference samples)...')
   results[[testsample]]<-NA
-  #
-  # write BED file of CNVs (is 1-based but irrelevant as only for visualisation)
-  #
-  write.table(NULL, file=sub("[.][^.]*$", ".bed", args[2], perl=TRUE), sep='\t', quote=FALSE)
 }
 
 #

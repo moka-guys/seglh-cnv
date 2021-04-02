@@ -23,6 +23,7 @@ args<-commandArgs(trailingOnly = TRUE)
 #
 message(paste('         Output:',args[1]))
 message(paste('      Reference:',args[2]))
+referenceFasta<-args[2]
 # read ROI
 targetfiles<-vector()
 for (roi in unlist(strsplit(args[3],','))) {
@@ -69,7 +70,7 @@ suppressWarnings(counts <- getBamCounts(
                             bam.files = bam,
                             min.mapq = 10,
                             include.chr = FALSE,  # chrom start with chr prefix
-                            referenceFasta = args[2]))
+                            referenceFasta = referenceFasta))
 
 counts<-as(counts, 'data.frame')
 
@@ -125,6 +126,7 @@ write.table(stats, file=sub("[.][^.]*$", ".csv", args[1], perl=TRUE), sep='\t', 
 # 
 
 save(list=c(
+            "referenceFasta",  # reference fasta
             "refsamplenames",  # selected reference samples (normals if provided)
             "counts",          # all read counts
             "rois",            # regions of interest (full)

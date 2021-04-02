@@ -46,6 +46,7 @@ RUN Rscript -e "install.packages('BiocManager');BiocManager::install(version = '
 
 # add exomedepth scripts and report template
 ADD readCount.R /root
+ADD ed2vcf.R /root
 ADD exomeDepth.R /root
 ADD exomeDepth.Rnw /root
 

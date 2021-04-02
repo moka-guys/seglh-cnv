@@ -24,6 +24,21 @@ The target intervals must be annotated with gene symbol and exon number as follo
 ```
 If intronic or intergenic regions are included they can be named accordingly using the same naming principle (eg. GATA2-INTRON_1). Exomedepth uses the exon/intron numbers only to label the CNVs in the report output and they are not part of the applied mathematical model.
 
+## Output files
+
+While only single output files are to be defined in the read count and exomedepth step, both scripts produce a set of output files. Be aware that only the PDF report masks CNVs which are outside of the BED regions supplied to the ExomeDepth step. ``VCF`` and ``BED`` files contain the full output and should be filtered accordingly to mask incidental findings.
+
+### Read count
+
+- ``readCount.RData`` - Read count data and selected references per sample
+- ``readCount.csv`` - Model parameters and QC metrics output (can be used to build a QC classifier, see below)
+
+### Exomedepth
+
+- ``output.pdf`` - Exomedepth CNV report with all QC information
+- ``output.bed`` - CNVs in BED format (whole panel)
+- ``output.vcf`` - CNVs in VCF format (whole panel, with out-of-scope filter tags, see VCF file header)
+
 ## Usage
 
 Build the docker container which contains all scripts with `make`.
