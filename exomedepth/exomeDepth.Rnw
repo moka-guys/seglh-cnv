@@ -144,7 +144,7 @@ sampleTable<-function(ref) {
   cat("\\end{scriptsize}")
   #cat("\n\\pagebreak")
 }
-lowCoverageExons<-function(pagerows=30) {
+lowCoverageExons<-function(pagerows=55) {
   if (nrow(coverage.table)>0) {
     cat("\\begin{warning}")
     cat(paste0("\\subsubsection*{Coverage limitations (median below ",limit.coverage,"X)}"))
