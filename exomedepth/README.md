@@ -30,14 +30,14 @@ While only single output files are to be defined in the read count and exomedept
 
 ### Read count
 
-- ``readCount.RData`` - Read count data and selected references per sample
-- ``readCount.csv`` - Model parameters and QC metrics output (can be used to build a QC classifier, see below)
+- `readCount.RData` - Read count data and selected references per sample
+- `readCount.csv` - Model parameters and QC metrics output (can be used to build a QC classifier, see below)
 
 ### Exomedepth
 
-- ``output.pdf`` - Exomedepth CNV report with all QC information
-- ``output.bed`` - CNVs in BED format (whole panel)
-- ``output.vcf`` - CNVs in VCF format (whole panel, with out-of-scope filter tags, see VCF file header)
+- `output.pdf` - Exomedepth CNV report with all QC information
+- `output.bed` - CNVs in BED format (whole panel)
+- `output.vcf` - CNVs in VCF format (whole panel, with out-of-scope filter tags, see VCF file header)
 
 ## Usage
 
@@ -82,19 +82,16 @@ docker run -it \
 ```
 NB: The last argument is optional (see below)
 
-#### Output files
+Additional output files are produced as described above.
 
-1. `output.pdf` contains the CNV report
-2. `output.bed` contains the deletion/duplication intervals and the log-likelihood ratio as score.
-
-### Integrated Quality Control
+## Integrated Quality Control
 
 The report contains pertinent information for Quality control. Two plots visualise the RPKM correlation with other samples in the same batch, and the coefficient of variation.
 
 A table summarises if QC thresholds have been met (PASS), failed a soft threshold (CAUTION) or a hard threshold (FAIL). If a threshold is not met, an interpretation help is provided in the report.
 
 Optionally a random forest classifier can be provided which will indicate the PASS/FAIL classification in the report. This classification is only a recommendation and the scientist has ultimate authority to classify the sample as failed.
-#### QC Thresholds
+### QC Thresholds
 
 Exomdedepth implements default QC thresholds as follows:
 
@@ -120,7 +117,7 @@ limits<-list(
 
 The `buildQcRfc.R` script contains an example how these can be specified.
 
-#### Random Forest QC classifier
+### Random Forest QC classifier
 
 SEGLH-Exomedepth can optionally provide a QC classification based on previous labeled data. The classfier is automatically optimised for the number of random variables considered and runs 200 trees by default. All labeled samples are part of the training set.
 
