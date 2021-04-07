@@ -16,3 +16,6 @@ push: build
 build:
 	docker build -t $(IMG_VERSIONED) .
 	docker tag $(IMG_VERSIONED) $(IMG_LATEST)
+
+cleanbuild:
+	docker build --no-cache -t $(IMG_VERSIONED) .
