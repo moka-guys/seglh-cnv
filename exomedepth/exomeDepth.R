@@ -62,6 +62,13 @@ message(paste('  Normalisation:',normalisation.method))
 message(paste('    Ref samples:',length(refsamplenames[which(testsample!=refsamplenames)])))
 
 #
+# Check if testsample in refsamples
+#
+if (!testsample%in%names(refsets)) {
+  stop(paste("The requested sample not available in", paste(names(refsets),collapse=',')))
+}
+
+#
 # run if enough samples
 #
 results<-list()
@@ -82,13 +89,13 @@ if (length(refsamplenames)>=3) {
   #
   # set defaults and load QC limits (override)
   #
-  limit.coverage<-100
   limits<-list(
     medcor=c(NA, 0.90),   # median correlation within batch
     maxcor=c(0.95, 0.90), # max correlation within batch
     refcor=c(0.95, 0.90), # reference set correlation
     refcount=c(5,3),      # refernce set size (selected reference samples)
-    coeffvar=c(30, 35)    # coefficient of variation
+    coeffvar=c(30, 35),   # coefficient of variation
+    coverage<-c(100)      # Minimum exon depth (read count)
   )
   predicted_qc<-NA
   if (!is.na(args[6])) load(args[6])
@@ -103,7 +110,7 @@ if (length(refsamplenames)>=3) {
     coverage.min=apply(counts[,refsamplenames],1,min),
     coverage.median=apply(counts[,refsamplenames],1,median),
     coverage.max=apply(counts[,refsamplenames],1,max))
-  coverage.table<-coverage.df[which(coverage.df$coverage.median<limit.coverage & coverage.df$exon%in%exonnames),]
+  coverage.table<-coverage.df[which(coverage.df$coverage.median<limits$coverage & coverage.df$exon%in%exonnames),]
 
   #
   # prepare reference (sum reference choice)
@@ -116,7 +123,7 @@ if (length(refsamplenames)>=3) {
   #
   # Build QC table and predict Quality outcome of classifier provided
   #
-  if (!is.na(args[6])) {
+  if (!is.na(args[6]) && !is.null(rfc)) {
     predicted_qc<-predict(rfc,stats[testsample,2:ncol(stats)])
   }
   # build QC table

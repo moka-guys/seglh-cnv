@@ -43,7 +43,7 @@
 \renewcommand{\sectionmark}[1]{\markright{#1}}
 \fancyhf{}
 <<headnote, echo=FALSE, message=FALSE, results='asis' >>=
-cat(paste(c("\\lhead{ExomeDepth ",pipeversion,"}"),collate="",sep=""))
+cat(paste(c("\\lhead{ExomeDepth ",gsub("_"," ",pipeversion),"}"),collate="",sep=""))
 @
 \rhead{\rightmark}
 \lfoot{\today}
@@ -77,11 +77,11 @@ CNVconfidence<-function(cnvs) {
   ifelse(cnvs$reads.expected<50 | (cnvs$reads.ratio>0.75 & cnvs$reads.ratio<1.25),"LOW","HIGH")
 }
 qcWarning<-function() {
-  cat("\\begin{warning}")
-  cat("\\begin{quote}")
-  cat("\\textbf{One or more QC measures have exceeded set thresholds. Check QC report!}")
-  cat("\\end{quote}")
-  cat("\\end{warning}")
+  cat("\\begin{warning}\n")
+  cat("\\begin{quote}\n")
+  cat("\\textbf{One or more QC measures have exceeded set thresholds. Check QC report!}\n")
+  cat("\\end{quote}\n")
+  cat("\\end{warning}\n")
 }
 qcTable<-function() {
   if (!is.na(predicted_qc)) {
@@ -130,7 +130,8 @@ qcTable<-function() {
 }
 sampleTable<-function(ref) {
   # calculate correlations
-  counts.correlation<-cor(counts[,refsamplenames])
+  counts.refsamples<-counts[,refsamplenames]
+  counts.correlation<-cor(counts.refsamples)
   refsample.table<-cbind(
     ref$summary.stats,
     #correlationmax=apply(counts.correlation[ref$summary.stats$ref.samples,],1,function(x) x[x!=1]),
@@ -146,7 +147,7 @@ sampleTable<-function(ref) {
 }
 lowCoverageExons<-function(pagerows=55) {
   if (nrow(coverage.table)>0) {
-    cat(paste0("Low coverage could reduce CNV detection sensitivity. Regions with median below ",limit.coverage,"x coverage:\\\\"))
+    cat(paste0("Low coverage could reduce CNV detection sensitivity. Regions with median below ",limits$coverage,"x coverage:\\\\"))
     cat("\\begin{scriptsize}")
     subtables<-ceiling(nrow(coverage.table)/pagerows)
     for (i in 1:subtables) {
@@ -156,7 +157,7 @@ lowCoverageExons<-function(pagerows=55) {
     }
     cat("\\end{scriptsize}")
   } else {
-    cat(paste0("Median coverage exceeds ",limit.coverage,"x in all target regions."))
+    cat(paste0("Median coverage exceeds ",limits$coverage,"x in all target regions."))
   }
 }
 CNVtable<-function(cnvtable) {
@@ -169,7 +170,7 @@ CNVtable<-function(cnvtable) {
     kbl(cnvtable, row.names=FALSE, format='latex', booktabs=TRUE) %>%
     footnote(general=paste(footnotes), general_title="")
   )
-  cat("\\end{scriptsize}")
+  cat("\\end{scriptsize}\n")
 }
 plotCNVs<-function(res, cnvs, extend=1000, fullgene=TRUE) {
   # reorder and remove BF<0
@@ -219,7 +220,7 @@ plotRefsampleStats<-function() {
   # plotting colours
   highlight<-ifelse(colnames(batch.cor)==testsample,'hotpink','snow2')
   bordercolour<-ifelse(colnames(batch.cor)==testsample,'black','snow4')
-  cat("\\begin{multicols}{2}")
+  cat("\\begin{multicols}{2}\n")
   boxplot(batch.cor, xaxt="n", col=highlight, border=bordercolour)
   abline(h=limits$medcor[2],col=c("red"),lty=2)
   title(main="Correlation within batch")
@@ -234,7 +235,7 @@ plotRefsampleStats<-function() {
   }
   title(main="Coefficient of variation")
   # END MULTICOLUMN
-  cat("\\end{multicols}")
+  cat("\\end{multicols}\n")
 }
 @
 
@@ -251,7 +252,7 @@ if (any(qc$status!="PASS") || nrow(coverage.table)>0) {
 # CNV results
 cat("\\subsection*{Called CNVs}")
 if (suppressWarnings(is.na(results[[testsample]]))) {
-  cat("\\textbf{NEED AT LEAST 2 REFERENCE SAMPLES TO RUN CNV ANALYSIS.}")
+  cat("\\textbf{NEED AT LEAST 2 REFERENCE SAMPLES TO RUN CNV ANALYSIS.}\n")
 } else {
   # PRINT CNVs
   if (!is.object(results[[testsample]])) {
@@ -271,26 +272,26 @@ if (suppressWarnings(is.na(results[[testsample]]))) {
       CNVtable(cnvtable)
       #cat("\\begin{verse}Coverage plots on following page.\\end{verse}")
       #cat('\n\\newpage')
-      # cat("\\subsubsection*{Coverage plots}")
-      cat("\\begin{multicols*}{2}")
+      cat("\\subsubsection*{Coverage plots}\n")
+      cat("\\begin{multicols*}{2}\n")
       plotCNVs(results[[testsample]],cnvs)
-      cat("\\end{multicols*}")
+      cat("\\end{multicols*}\n")
     } else {
       cat('\n\n\n')
-      cat("\\textbf{NO CNVs CALLED.}")
+      cat("\\textbf{NO CNVs CALLED.}\n")
     }
   }
 }
-cat('\n\\newpage')
-cat("\\subsection*{Quality Control}")
+cat('\\newpage\n')
+cat("\\subsection*{Quality Control}\n")
 qcTable()
-cat("\\subsubsection*{Batch statistics}")
+cat("\\subsubsection*{Batch statistics}\n")
 plotRefsampleStats()
 # PRINT REFERENCE SAMPLES
-cat("\\subsubsection*{Reference sample choice}")
+cat("\\subsubsection*{Reference sample choice}\n")
 sampleTable(refsets[[testsample]])
 # plot lowCoverageExons
-cat("\\subsubsection*{Coverage limitations}")
+cat("\\subsubsection*{Coverage limitations}\n")
 lowCoverageExons()
 
 
