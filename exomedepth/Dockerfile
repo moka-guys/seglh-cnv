@@ -17,14 +17,21 @@ WORKDIR /root
 ENV HOME /root
 
 RUN apt-get -y update
-RUN apt-get --yes install libcurl4-openssl-dev
-RUN apt-get --yes install time
-RUN apt-get --yes install libpoppler-cpp-dev
-RUN apt-get --yes install texlive
+RUN apt-get --yes install \
+	libcurl4-openssl-dev \
+	time \
+	libpoppler-cpp-dev \
+	texlive \
+	libssl-dev \
+	libfontconfig1-dev \
+	libxml2-dev
 
-# LateX packages
-RUN tlmgr init-usertree && \
-	tlmgr update --self
+# LateX packages (Locked on 2020 release)
+RUN tlmgr init-usertree
+RUN tlmgr repository add ftp://tug.org/historic/systems/texlive/2020/tlnet-final
+RUN tlmgr repository remove http://mirror.ctan.org/systems/texlive/tlnet
+RUN tlmgr option repository ftp://tug.org/historic/systems/texlive/2020/tlnet-final
+RUN tlmgr update --self
 RUN tlmgr install framed && \
 	tlmgr install mdframed && \
 	tlmgr install zref && \
