@@ -71,6 +71,7 @@ Reference samples are picked from within the same batch. If any BAM file is pref
 ```
 docker run -it \
 	-v /path_to_data:/data \
+	-v /path_to_genome:/resources \
 	seglh/exomedepth:latest \
 	exomeDepth.R \
 	VERSIONSTRING \
@@ -80,9 +81,9 @@ docker run -it \
 	/data/sample1.bam:SampleLabel \
 	/data/qcmodel.RData
 ```
-NB: The last argument is optional (see below)
+NB: The last argument is optional (see below).
 
-Additional output files are produced as described above.
+The script will reuse the same genome reference file for VCF generation. Make sure its location is available (mounted into the container). Additional output files are produced as described above.
 
 ## Integrated Quality Control
 

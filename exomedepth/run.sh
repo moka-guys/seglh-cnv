@@ -22,6 +22,7 @@ docker run -it \
 #
 docker run -it \
 	-v /path_to_data:/data \
+	-v /path_to_genome:/resources \
 	seglh/exomedepth:latest \
 	exomeDepth.R \
 	VERSIONSTRING \
