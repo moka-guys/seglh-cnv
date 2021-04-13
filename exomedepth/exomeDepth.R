@@ -95,7 +95,7 @@ if (length(refsamplenames)>=3) {
     refcor=c(0.95, 0.90), # reference set correlation
     refcount=c(5,3),      # refernce set size (selected reference samples)
     coeffvar=c(30, 35),   # coefficient of variation
-    coverage<-c(100)      # Minimum exon depth (read count)
+    coverage=c(100)      # Minimum exon depth (read count)
   )
   predicted_qc<-NA
   if (!is.na(args[6])) load(args[6])

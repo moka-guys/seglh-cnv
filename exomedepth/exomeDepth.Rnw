@@ -225,12 +225,12 @@ plotRefsampleStats<-function() {
   abline(h=limits$medcor[2],col=c("red"),lty=2)
   title(main="Correlation within batch")
   # Coeff of variation
-  ymin<-min(c(limits$cv,batch.cv))
-  ymax<-max(c(limits$cv,batch.cv))
+  ymin<-min(c(limits$coeffvar,batch.cv))
+  ymax<-max(c(limits$coeffvar,batch.cv))
   margin<-(ymax-ymin)*0.1
   barplot(batch.cv, xaxt="n",ylim=c(ymin-margin,ymax+margin),xpd=FALSE,col=highlight,border=bordercolour)
   box()
-  for (l in limits$cv) {
+  for (l in limits$coeffvar) {
     abline(h=l, col=ifelse(l==max(limits.cv),"red","chartreuse3"), lty=2)
   }
   title(main="Coefficient of variation")
