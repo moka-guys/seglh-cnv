@@ -137,8 +137,8 @@ if (length(refsamplenames)>=3) {
     list(
           value=round(v,3),
           threshold=threshold,
-          soft=t[1],
-          hard=t[2],
+          warning=t[1],
+          fail=t[2],
           status=status
     )
   }
