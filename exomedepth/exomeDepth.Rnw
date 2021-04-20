@@ -231,7 +231,7 @@ plotRefsampleStats<-function() {
   barplot(batch.cv, xaxt="n",ylim=c(ymin-margin,ymax+margin),xpd=FALSE,col=highlight,border=bordercolour)
   box()
   for (l in limits$coeffvar) {
-    abline(h=l, col=ifelse(l==max(limits.cv),"red","chartreuse3"), lty=2)
+    abline(h=l, col=ifelse(l==max(limits$coeffvar),"red","chartreuse3"), lty=2)
   }
   title(main="Coefficient of variation")
   # END MULTICOLUMN
