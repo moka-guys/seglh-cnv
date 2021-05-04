@@ -56,5 +56,6 @@ ADD readCount.R /root
 ADD ed2vcf.R /root
 ADD exomeDepth.R /root
 ADD exomeDepth.Rnw /root
+ADD VERSION /root
 
 ENTRYPOINT ["/usr/bin/Rscript"]

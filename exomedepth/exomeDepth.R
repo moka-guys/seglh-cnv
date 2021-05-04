@@ -47,8 +47,12 @@ threshold<-as.numeric(unlist(strsplit(args[5],':'))[3]) # Threshold set in ngs_c
 if(is.na(threshold)) {
     threshold<-10^-4
 }
-pipeversion<-args[1]
-load(args[4])  # loads counts,samplenames,rois (extended exons.hg19)
+# version report header
+argversion<-args[1]
+gitversion<-ifelse(file.exists("VERSION"),readChar("VERSION",7),"UNKNOWN")
+pipeversion<-paste(argversion,gitversion,sep="-")
+# loads counts,samplenames,rois (extended exons.hg19)
+load(args[4])
 normalisation.method<-ifelse(testsample%in%refsamplenames,'BATCH','PON')
 
 message(paste('        Version:',args[1]))
