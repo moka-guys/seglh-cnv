@@ -93,7 +93,7 @@ if (length(refsamplenames)>=3) {
     medcor=c(NA, 0.90),   # median correlation within batch
     maxcor=c(0.95, 0.90), # max correlation within batch
     refcor=c(0.95, 0.90), # reference set correlation
-    refcount=c(5,3),      # refernce set size (selected reference samples)
+    refcount=c(3,1),      # refernce set size (selected reference samples)
     coeffvar=c(30, 35),   # coefficient of variation
     coverage=c(100)      # Minimum exon depth (read count)
   )

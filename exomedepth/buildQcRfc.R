@@ -9,6 +9,9 @@
 
 require(randomForest)
 
+ntree<-200
+mtrytune<-TRUE
+
 # read command line args
 args<-commandArgs(trailingOnly=TRUE)
 
@@ -28,14 +31,17 @@ if (length(args)>1) {
   # build classifier and return error rate
   variables<-ncol(ed)-1
   oob.err<-double(variables)
-  for (mtry in 1:variables) {
-    rf<-randomForest(status~., data=ed, ntree=200, mtry=mtry, importance=TRUE)
-    oob.err[mtry]=rf$err.rate[nrow(rf$err.rate),"OOB"]
+  best.mtry<-floor(sqrt(variables))
+  if (mtrytune) {
+    for (mtry in 1:variables) {
+      rf<-randomForest(status~., data=ed, ntree=ntree, mtry=mtry, importance=TRUE)
+      oob.err[mtry]=rf$err.rate[nrow(rf$err.rate),"OOB"]
+    }
+    # pick best classifier
+    best.mtry<-which(min(oob.err)==oob.err)
   }
-  # pick best classifier
-  best.mtry<-which(min(oob.err)==oob.err)
   print(paste("MTRY",best.mtry))
-  rfc<-randomForest(status~., data=ed, ntree=200, mtry=best.mtry, importance=TRUE)
+  rfc<-randomForest(status~., data=ed, ntree=ntree, mtry=best.mtry, importance=TRUE)
   # show result
   importance(rfc)
   print(rfc)
@@ -46,7 +52,7 @@ limits<-list(
   medcor=c(NA, 0.90),   # median correlation within batch
   maxcor=c(0.95, 0.90), # max correlation within batch
   refcor=c(0.95, 0.90), # reference set correlation
-  refcount=c(5,3),      # refernce set size (selected reference samples)
+  refcount=c(3,1),      # refernce set size (selected reference samples)
   coeffvar=c(30, 35),   # coefficient of variation
   coverage=c(100)       # exon coverage limit
 )
