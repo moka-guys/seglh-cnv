@@ -13,6 +13,13 @@ if (!("ExomeDepth" %in% installed.packages())) {
 cat(paste('Loading Packages\n'))
 require(warn.conflicts=FALSE,quietly=TRUE,package="plyr")
 require(warn.conflicts=FALSE,quietly=TRUE,package="ExomeDepth")
+
+#
+# configs
+#
+normalprefix<-'NORMAL'
+cmp.cols<-3
+
 #
 # READ ARGS
 #
@@ -31,29 +38,6 @@ for (roi in unlist(strsplit(args[3],','))) {
     message(paste('            ROI:',roi))
 }
 
-# read tracks (BAM files)
-bam<-args[4:length(args)]
-for (bamfile in bam) {
-    message(paste('          Track:',bamfile))
-}
-
-#
-# select normal samples (if 3+ specified)
-#
-refsamplenames<-as.vector(sapply(bam,basename))
-testsamplenames<-refsamplenames
-# NORMAL selection
-normalprefix<-'NORMAL'
-normals<-which(substr(refsamplenames,1,nchar(normalprefix)) == normalprefix)
-tests<-which(substr(testsamplenames,1,nchar(normalprefix)) != normalprefix)
-if (length(normals)>2) {
-    message("Will use Panel of Normals...")
-    refsamplenames<-refsamplenames[normals]
-    testsamplenames<-testsamplenames[tests]
-} else {
-    message('Will use intra-batch normalisation...')
-}
-
 #
 # load/combine exon/ROI data and make unique
 #
@@ -62,17 +46,82 @@ for (tf in targetfiles) rois<-rbind(rois,read.table(tf,header=FALSE)[,1:4])
 rois<-unique(rois)
 colnames(rois)<-c('chromosome','start','end','name')
 
+
+# read tracks (BAM files, precomputed normals)
+bam<-vector()
+pcn<-vector()
+for (bamfile in args[4:length(args)]) {
+    if (endsWith(bamfile,'.bam')) {
+        bam<-append(bam,bamfile)
+        message(paste('          Track:',bamfile))
+    } else if (endsWith(bamfile,'.RData')) {
+        pcn<-append(pcn,bamfile)
+        message(paste('         Counts:',bamfile))
+    } else {
+        message(paste('        Skipped:',bamfile))
+    }
+}
+
+#
+# omit normals that are in supplied counts file
+#
+names.imported<-vector()
+for (c in pcn) {
+    attach(c)
+    names.imported<-append(names.imported,
+                           colnames(counts)[which(startsWith(colnames(counts),normalprefix))])
+    detach()
+}
+# remove imported normals from bam list
+bams.to.count<-which(!as.vector(sapply(bam,basename))%in%names.imported)
+bam<-bam[bams.to.count]
+
 #
 # generate read counts from BAM files for all exons
 #
-suppressWarnings(counts <- getBamCounts(
+suppressWarnings(counts.computed <- getBamCounts(
                             bed.frame = rois,
                             bam.files = bam,
                             min.mapq = 10,
                             include.chr = FALSE,  # chrom start with chr prefix
                             referenceFasta = referenceFasta))
+counts.computed<-as(counts.computed, 'data.frame')
 
-counts<-as(counts, 'data.frame')
+
+#
+# add precomputed counts (normals only)
+# 
+for (c in pcn) {
+    # import precomputed normals
+    attach(c)
+    targets.imported<-counts[,c(1:cmp.cols)]
+    counts.imported<-counts[,which(startsWith(colnames(counts),normalprefix))]
+    detach()
+    # if compatible normals, amend counts table
+    targets.same<-all.equal(counts.computed[,c(1:cmp.cols)], targets.imported)
+    if (targets.same && ncol(counts.imported)>0) {
+        counts.computed<-cbind(counts.computed,counts.imported)
+    } else {
+        message(paste('ERROR: Supplied count data not compatible',c))
+    }
+}
+counts<-counts.computed
+
+#
+# select normal samples (if 3+ specified)
+#
+refsamplenames<-colnames(counts)[which(endsWith(colnames(counts),'.bam'))]
+testsamplenames<-refsamplenames
+# NORMAL selection
+normals<-which(substr(refsamplenames,1,nchar(normalprefix)) == normalprefix)
+tests<-which(substr(testsamplenames,1,nchar(normalprefix)) != normalprefix)
+if (length(normals)>0) {
+    message("Will use Panel of Normals...")
+    refsamplenames<-refsamplenames[normals]
+    testsamplenames<-testsamplenames[tests]
+} else {
+    message('Will use intra-batch normalisation...')
+}
 
 #
 # Calculate RPKM

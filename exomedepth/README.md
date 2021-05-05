@@ -66,7 +66,7 @@ docker run -it \
 ### Step 2 - Run Exomedepth
 
 This steps will pick the most appropriate reference samples and run exomedepth for a given sample.
-Reference samples are picked from within the same batch. If any BAM file is prefixed with _NNN_ it will be considered part of a panel of normals which will be used as reference instead of other batched samples (requires at least 2 normal samples).
+Reference samples are picked from within the same batch. If any BAM file is prefixed with _NORMAL_ it will be considered part of a panel of normals which will be used as reference instead of other batched samples (requires at least 2 normal samples).
 
 ```
 docker run -it \
@@ -85,6 +85,33 @@ NB: The last argument is optional (see below).
 
 The script will reuse the same genome reference file for VCF generation. Make sure its location is available (mounted into the container). Additional output files are produced as described above.
 
+## Reference sample modes
+
+Exomedepth, as default, runs with intra-batch normalisation (normals are picked from batch). Alternatively a panel of normals (PoN) can be used. This is highly recommended if the batch sizes are small or known negatives are available to ensure sensitivity to clinically relevant variants.
+
+### Intra-batch normalisation
+
+### Panel of Normals (PoN)
+
+To run exomedepth in PoN mode, supply normal BAMs to the readCount step as any other BAM file, but ensure their name is prefixed with _NORMAL_. This will automatically switch to PoN mode. The used normalisation mode is also indicated on the PDF reports, alongside the picked normal samples.
+
+To avoid recounting reads for the normal samples, a `readCount.RData` file from a previous run can be supplied and the normals contained in this run will be merged into the counts table. Normal BAMs supplied will not be recounted if they are in the RData file.
+
+```
+docker run -it \
+	-v /path_to_data:/data \
+	-v /path_to_genome:/resources \
+	seglh/exomedepth:latest \
+	readCount.R \
+	/data/readCount.RData \
+	/genome/human_g1k_v37_decoy.fasta \
+	/data/targets.bed \
+	/data/sample1.bam \
+	/data/sample2.bam \
+	/data/NORMAL1.bam \ <- will not be recounted if in RData file below
+	/data/previous_readCount.RData  <- output from a previous run containing the PoN
+```
+
 ## Integrated Quality Control
 
 The report contains pertinent information for Quality control. Two plots visualise the RPKM correlation with other samples in the same batch, and the coefficient of variation.
@@ -102,7 +129,7 @@ Exomdedepth implements default QC thresholds as follows:
 | Maximum Correlation in Batch        |           0.95 |           0.90 |
 | Coefficent of Variation             |             30 |             35 |
 | Correlation with selected reference |           0.95 |           0.90 |
-| Selected reference samples          |              5 |              3 |
+| Selected reference samples          |              3 |              1 |
 
 These can be overridden by providing an RData file containing thresholds as follows:
 
