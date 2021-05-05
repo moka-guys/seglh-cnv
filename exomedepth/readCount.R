@@ -128,10 +128,10 @@ if (length(normals)>0) {
 #
 calcRPKM<-function(c,l) c/(l*sum(c)/10^6)
 counts.len<-counts$end-counts$start+1
-rpkm<-apply(counts[,c(6:ncol(counts))],2,function(x) calcRPKM(x,counts.len))
+rpkm<-apply(counts[,testsamplenames],2,function(x) calcRPKM(x,counts.len))
 
 #
-# Calculate batch statistics (all samples and normals if any)
+# Calculate batch statistics (all samples excluding normals if any)
 #
 batch.cv<-apply(rpkm,2,function(r) sd(r)/mean(r)*100)
 batch.cor<-cor(rpkm)
