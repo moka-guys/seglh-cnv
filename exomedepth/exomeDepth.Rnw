@@ -208,10 +208,10 @@ plotCNVs<-function(res, cnvs, extend=1000, fullgene=TRUE) {
           with.gene=TRUE, main=paste(g,collapse=',')),
         error = function(err) err
       )
-      # # add CNV overlay and BF
-      # cnvcolour<-ifelse(cnvs[i,'reads.ratio']<1, '#FF000044', '#00FF0044')
-      # rect(as.numeric(cnvs[i,'start']), -0.1, cnvs[i,'end'], 1.1, col = cnvcolour, border=NA)
-      # text(cnvs[i,'end'],0.7,pos=4,labels=cnvs[i,'BF'])# # annotate with Bayes Factor
+      # add CNV overlay and BF
+      cnvcolour<-ifelse(cnvs[i,'reads.ratio']<1, '#FF000044', '#00FF0044')
+      rect(as.numeric(cnvs[i,'start']), -0.1, cnvs[i,'end'], 1.1, col = cnvcolour, border=NA)
+      text(cnvs[i,'end'],0.7,pos=4,labels=cnvs[i,'BF'])# # annotate with Bayes Factor
     }
   }
   par(.pardefault) # restore plot environment
