@@ -112,6 +112,38 @@ docker run -it \
 	/data/previous_readCount.RData  <- output from a previous run containing the PoN
 ```
 
+Ideally a panel of normals is created as a standalone file without any test samples included, and then supplied to the ``readCount`` step as an `.RData` file as follows:
+
+```
+docker run -it \
+	-v /path_to_data:/data \
+	-v /path_to_genome:/resources \
+	seglh/exomedepth:latest \
+	readCount.R \
+	/data/normals.RData \
+	/genome/human_g1k_v37_decoy.fasta \
+	/data/targets.bed \
+	/data/NORMAL1.bam \
+	/data/NORMAL2.bam \
+	/data/NORMAL3.bam
+```
+
+
+```
+docker run -it \
+	-v /path_to_data:/data \
+	-v /path_to_genome:/resources \
+	seglh/exomedepth:latest \
+	readCount.R \
+	/data/readCount.RData \
+	/genome/human_g1k_v37_decoy.fasta \
+	/data/targets.bed \
+	/data/sample1.bam \
+	/data/sample2.bam \
+	/data/sample3.bam \
+	/data/normals.RData
+```
+
 ## Integrated Quality Control
 
 The report contains pertinent information for Quality control. Two plots visualise the RPKM correlation with other samples in the same batch, and the coefficient of variation.

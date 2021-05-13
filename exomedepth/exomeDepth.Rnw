@@ -145,7 +145,7 @@ sampleTable<-function(ref) {
   cat("\\end{scriptsize}")
   #cat("\n\\pagebreak")
 }
-lowCoverageExons<-function(pagerows=55) {
+lowCoverageExons<-function(pagerows=70) {
   if (nrow(coverage.table)>0) {
     cat(paste0("Low coverage could reduce CNV detection sensitivity. Regions with median below ",limits$coverage,"x coverage:\\\\"))
     cat("\\begin{scriptsize}")
@@ -153,7 +153,11 @@ lowCoverageExons<-function(pagerows=55) {
     for (i in 1:subtables) {
       startrow<-((i-1)*pagerows)+1
       endrow<-min(nrow(coverage.table), i*pagerows)
-      print(kbl(coverage.table[startrow:endrow,], row.names=FALSE, format='latex', booktabs=TRUE))
+      print(kbl(
+                coverage.table[startrow:endrow,], 
+                row.names=FALSE, 
+                format='latex', 
+                booktabs=TRUE))
     }
     cat("\\end{scriptsize}")
   } else {

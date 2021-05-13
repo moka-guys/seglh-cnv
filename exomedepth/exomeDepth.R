@@ -49,11 +49,14 @@ if(is.na(threshold)) {
 }
 # version report header
 argversion<-args[1]
-gitversion<-ifelse(file.exists("VERSION"),readChar("VERSION",7),"UNKNOWN")
-pipeversion<-paste(argversion,gitversion,sep="-")
+versionfile<-paste(scriptDirectory,'VERSION', sep='/')
+pipeversion<-ifelse(file.exists(versionfile),
+                    paste(argversion,readChar(versionfile,7),sep="-"),
+                    argversion)
+
 # loads counts,samplenames,rois (extended exons.hg19)
 load(args[4])
-normalisation.method<-ifelse(testsample%in%refsamplenames,'BATCH','PON')
+normalisation.method<-ifelse(testsample%in%refsamplenames,'BATCH','PoN')
 
 message(paste('        Version:',args[1]))
 message(paste('         Output:',args[2]))
