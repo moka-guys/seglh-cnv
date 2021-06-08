@@ -22,11 +22,13 @@ docker run -it \
 #
 docker run -it \
 	-v /path_to_data:/data \
+	-v /path_to_genome:/resources \
 	seglh/exomedepth:latest \
 	exomeDepth.R \
 	VERSIONSTRING \
 	/data/output.pdf \
 	/data/targets.bed:PANELNAME \
 	/data/readCount.RData \
-	/data/sample1.bam:Sample1
+	/data/sample1.bam:Sample1 \
+	/data/qcrfc.RData
 

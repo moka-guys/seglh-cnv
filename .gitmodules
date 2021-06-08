@@ -1,0 +1,3 @@
+[submodule "decon/DEcON"]
+	path = decon/DEcON
+	url = https://github.com/RahmanTeam/DECoN.git

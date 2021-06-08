@@ -17,28 +17,45 @@ WORKDIR /root
 ENV HOME /root
 
 RUN apt-get -y update
-RUN apt-get --yes install libcurl4-openssl-dev
-RUN apt-get --yes install time
-RUN apt-get --yes install libpoppler-cpp-dev
-RUN apt-get --yes install texlive
+RUN apt-get --yes install \
+	libcurl4-openssl-dev \
+	time \
+	libpoppler-cpp-dev \
+	texlive \
+	libssl-dev \
+	libfontconfig1-dev \
+	libxml2-dev
 
-# LateX packages
-RUN tlmgr init-usertree && \
-	tlmgr update --self && \
-	tlmgr install framed
+# LateX packages (Locked on 2020 release)
+RUN tlmgr init-usertree
+RUN tlmgr repository add ftp://tug.org/historic/systems/texlive/2020/tlnet-final
+RUN tlmgr repository remove http://mirror.ctan.org/systems/texlive/tlnet
+RUN tlmgr option repository ftp://tug.org/historic/systems/texlive/2020/tlnet-final
+RUN tlmgr update --self
+RUN tlmgr install framed && \
+	tlmgr install mdframed && \
+	tlmgr install zref && \
+	tlmgr install needspace && \
+	tlmgr install dingbat && \
+	tlmgr install booktabs && \
+	tlmgr install xcolor
 
 # R dependencies
 RUN Rscript -e "install.packages('BiocManager');BiocManager::install(version = '3.12')" && \
 	Rscript -e "BiocManager::install(c('Biostrings','IRanges','Rsamtools','GenomicRanges','GenomicAlignments'))" && \
 	Rscript -e "install.packages('optparse')" && \
+	Rscript -e "install.packages('randomForest')" && \
 	Rscript -e "install.packages('ExomeDepth')" && \
 	Rscript -e "install.packages('plyr')" && \
 	Rscript -e "install.packages('knitr')" && \
+	Rscript -e "install.packages('kableExtra')" && \
 	Rscript -e "install.packages('tinytex')"
 
 # add exomedepth scripts and report template
 ADD readCount.R /root
+ADD ed2vcf.R /root
 ADD exomeDepth.R /root
 ADD exomeDepth.Rnw /root
+ADD VERSION /root
 
 ENTRYPOINT ["/usr/bin/Rscript"]

@@ -23,25 +23,20 @@ cat(paste('Loading Packages\n'))
 require(warn.conflicts=FALSE,quietly=FALSE,package="GenomicRanges")
 require(warn.conflicts=FALSE,quietly=FALSE,package="ExomeDepth")
 require(warn.conflicts=FALSE,quietly=FALSE,package="knitr")
-
-#
-# DEFINE FUNCTIONS
-#
-selectReferenceSet<-function(df, test.sample, ref.samples, remove.test=TRUE) {
-    # remove self
-    if (remove.test) ref.samples<-ref.samples[which(ref.samples!=test.sample)]
-    # select best reference samples
-    select.reference.set(test.counts = df[,test.sample], reference.counts = as.matrix(df[,ref.samples]), bin.length = (df$end - df$start))
-}
+require(warn.conflicts=FALSE,quietly=FALSE,package="kableExtra")
+require(warn.conflicts=FALSE,quietly=FALSE,package="randomForest")
+require(warn.conflicts=FALSE,quietly=FALSE,package="Rsamtools")
+source('ed2vcf.R')
 
 #
 # READ ARGS
 #
-scriptDirectory<-getwd() # save running directory
-args<-commandArgs(trailingOnly = TRUE)
-setwd(dirname(args[2]))  # set working directory to target directory (THIS IS ABSOLUTELY NECESSARY!)
 cmd<-commandArgs(trailingOnly = FALSE)
 runningScript<-unlist(strsplit(cmd[which(substr(cmd,1,7)=='--file=')],'='))[2]
+scriptDirectory<-normalizePath(dirname(runningScript))
+args<-commandArgs(trailingOnly = TRUE)
+setwd(dirname(args[2]))  # set working directory to target directory (THIS IS ABSOLUTELY NECESSARY!)
+
 #
 # print what will be printed
 #
@@ -52,8 +47,17 @@ threshold<-as.numeric(unlist(strsplit(args[5],':'))[3]) # Threshold set in ngs_c
 if(is.na(threshold)) {
     threshold<-10^-4
 }
-pipeversion<-args[1]
-load(args[4])  # loads counts,samplenames,rois (extended exons.hg19)
+# version report header
+argversion<-args[1]
+versionfile<-paste(scriptDirectory,'VERSION', sep='/')
+pipeversion<-ifelse(file.exists(versionfile),
+                    paste(argversion,readChar(versionfile,7),sep="-"),
+                    argversion)
+
+# loads counts,samplenames,rois (extended exons.hg19)
+load(args[4])
+normalisation.method<-ifelse(testsample%in%refsamplenames,'BATCH','PoN')
+
 message(paste('        Version:',args[1]))
 message(paste('         Output:',args[2]))
 message(paste('            ROI:',panel[1]))
@@ -61,54 +65,117 @@ message(paste('     Panel Name:',panel[2]))
 message(paste('    Read Counts:',args[4]))
 message(paste('   Original BAM:',testsample))
 message(paste('     SampleName:',samplename))
-message(paste('    Ref samples:',length(bam)-1))
+message(paste('  Normalisation:',normalisation.method))
+message(paste('    Ref samples:',length(refsamplenames[which(testsample!=refsamplenames)])))
+
+#
+# Check if testsample in refsamples
+#
+if (!testsample%in%names(refsets)) {
+  stop(paste("The requested sample not available in", paste(names(refsets),collapse=',')))
+}
 
 #
 # run if enough samples
 #
-refsets<-list()
 results<-list()
-if (length(bam)>=3) {
+qc<-data.frame() ## to make sure qc table gets saved
+if (length(refsamplenames)>=3) {
   #
   # read exons/ROI and create subset
   #
   message('Getting ROIs...')
-  counts<-counts[which(counts$exon%in%rois$name),]  # reduce to target regions
-  exons <- GRanges(seqnames = rois$chromosome,
-                   IRanges(start=rois$start,end=rois$end),
-                   names = rois$name)
+  counts<-counts[which(counts$exon%in%rois$name),]  # reduce to target regions (from readCount)
+  exons <- GRanges(seqnames = rois$chromosome, IRanges(start=rois$start,end=rois$end), names = rois$name)
   covered <- with(read.table(panel[1],header=FALSE),
                   GRanges(seqnames = V1, IRanges(start=V2+1, end=V3, names=V4),names=V4))  # BED FILE 0-based
   coveredexons<-subsetByOverlaps(exons,covered)
   ce<-data.frame(seqnames=seqnames(coveredexons), starts=start(coveredexons)-1, ends=end(coveredexons), name=mcols(coveredexons)$names)
+  selected.genes<-unique(sapply(strsplit(ce$name,'_'),function(x) x[1]))
 
   #
-  # run exomedepth
+  # set defaults and load QC limits (override)
   #
-  # select normal samples (if 3+ specified)
-  message('Selecting Normals (if any starting with NNN)...')
-  refsamplenames<-as.vector(sapply(bam,basename))
-  normals<-which(unlist(lapply(refsamplenames,function(x) substr(x,1,3)))=='NNN')
-  if (length(normals)>2) refsamplenames<-refsamplenames[normals]
+  limits<-list(
+    medcor=c(NA, 0.90),   # median correlation within batch
+    maxcor=c(0.95, 0.90), # max correlation within batch
+    refcor=c(0.95, 0.90), # reference set correlation
+    refcount=c(3,1),      # refernce set size (selected reference samples)
+    coeffvar=c(30, 35),   # coefficient of variation
+    coverage=c(100)      # Minimum exon depth (read count)
+  )
+  predicted_qc<-NA
+  if (!is.na(args[6])) load(args[6])
 
-  # estimate reference set
-  refsets[[samplename]]<-selectReferenceSet(counts, testsample, refsamplenames, TRUE)
+  #
+  # Define low coverage exons
+  #
+  exonnames<-coveredexons@elementMetadata@listData$names
+  coverage.df<-data.frame(
+    exon=counts$exon,
+    gc=counts$GC,
+    coverage.min=apply(counts[,refsamplenames],1,min),
+    coverage.median=apply(counts[,refsamplenames],1,median),
+    coverage.max=apply(counts[,refsamplenames],1,max))
+  coverage.table<-coverage.df[which(coverage.df$coverage.median<limits$coverage & coverage.df$exon%in%exonnames),]
+
+  #
+  # prepare reference (sum reference choice)
+  #
+  reference.selected<-apply(X = as.matrix(counts[, refsets[[testsample]]$reference.choice, drop = FALSE]),
+                            MAR = 1,
+                            FUN = sum)
+  reference.selected<-as.vector(reference.selected)
+
+  #
+  # Build QC table and predict Quality outcome of classifier provided
+  #
+  if (!is.na(args[6]) && !is.null(rfc)) {
+    predicted_qc<-predict(rfc,stats[testsample,2:ncol(stats)])
+  }
+  # build QC table
+  ref.correlation<-cor(cbind(rpkm[,testsample],calcRPKM(reference.selected,(counts$end-counts$start+1))))[1,2]
+  # decide on failures
+  decide<-function(v,t) {
+    cmp<-ifelse(any(is.na(t)) || t[1]>t[2], function(m,n) m>=n, function(m,n) m<n)
+    threshold<-ifelse(any(is.na(t)) || t[1]>t[2],"equal or greater than","less than" )
+    status<-ifelse(!is.na(t[2]) && !cmp(v,t[2]),"FAIL",
+                ifelse(!is.na(t[1]) && !cmp(v,t[1]),"CAUTION","PASS"))
+    list(
+          value=round(v,3),
+          threshold=threshold,
+          warning=t[1],
+          fail=t[2],
+          status=status
+    )
+  }
+
+  qc<-rbind(
+    decide(stats[testsample,"batch.mediancor"],limits$medcor),
+    decide(stats[testsample,"batch.maxcor"],limits$maxcor),
+    decide(stats[testsample,"coeff.var"],limits$coeffvar),
+    decide(ref.correlation, limits$refcor),
+    decide(length(refsets[[testsample]]$reference.choice),limits$refcount)
+  )
+  rownames(qc)=c(
+            "Median correlation in batch",
+            "Maximum correlation in batch",
+            "Coefficient of variation",
+            "Correlation with reference",
+            "Size of reference set"
+  )
+  qc<-as.data.frame(qc)
+
   #
   # run exome depth
   #
-  # prepare reference (sum reference choice)
-  reference.selected<-apply(X = as.matrix(counts[, refsets[[samplename]]$reference.choice, drop = FALSE]),
-                            MAR = 1, FUN = sum)
-  reference.selected<-as.vector(reference.selected)
-  # create ED object
   message('*** Creating ExomeDepth object...')
   suppressWarnings(ED <- new('ExomeDepth',
                              test = counts[,testsample],
                              reference = reference.selected,
                              formula = 'cbind(test, reference) ~ 1'))
-  message('==========')
   # call CNV
-  message('Calling CNVs...')
+  message('*** Calling CNVs...')
   result<-CallCNVs(x = ED,
                    transition.probability = threshold,
                    chromosome = counts$chromosome,
@@ -117,33 +184,39 @@ if (length(bam)>=3) {
                    name = counts$exon)
 
   # annotate results
+  print(paste('Raw CNV count:',length(result@CNV.calls)))
   message('Annotating CNVs...')
-  print(length(result@CNV.calls))
   if (length(result@CNV.calls)>0) {
-    result.annotated<-AnnotateExtra(x = result, reference.annotation = exons,
+    # add exon numbers (from subset)
+    result.annotated<-AnnotateExtra(x = result, reference.annotation = coveredexons,
       min.overlap = 0.0001, column.name = 'exons.hg19')
     result.annotated@annotations$name<-as.factor(sapply(strsplit(as.character(result.annotated@annotations$name),'_'),"[[",1))
-    results[[samplename]]<-result.annotated
-    # write BED file of CNVs (is 1-based but irrelevant as only for visualisation)
-    write.table(results[[samplename]]@CNV.calls[which(results[[samplename]]@CNV.calls[,9]>0),c(7,5,6,3,9)], file=sub("[.][^.]*$", ".bed", args[2], perl=TRUE), sep='\t', col.names=FALSE, quote=FALSE, row.names=FALSE)
+    results[[testsample]]<-result.annotated
+    # write BED file of CNVs
+    bed.data<-results[[testsample]]@CNV.calls[which(results[[testsample]]@CNV.calls[,9]>0),c(7,5,6,3,9)]
+    bed.data[,2]<-bed.data[,2]-1
+    write.table(bed.data, file=sub("[.][^.]*$", ".bed", args[2], perl=TRUE), sep='\t', col.names=FALSE, quote=FALSE, row.names=FALSE)
+    # write VCF file
+    if (file.exists(referenceFasta)) {
+      ed2vcf(results[[testsample]], sub("[.][^.]*$",".vcf",args[2],perl=TRUE), referenceFasta, rois, samplename)
+    }
   } else {
-    # no results, empty bed file
-    results[[samplename]]<-FALSE  # no CNVs called
+    # no results, empty BED and VCF files
+    results[[testsample]]<-FALSE  # no CNVs called
     write.table(NULL, file=sub("[.][^.]*$", ".bed", args[2], perl=TRUE), sep='\t', quote=FALSE)
+    if (file.exists(referenceFasta)) {
+      ed2vcf(NULL, sub("[.][^.]*$",".vcf",args[2],perl=TRUE), referenceFasta, rois, samplename)
+    }
   }
 } else {
   message('Skipping ExomeDepth (not enough reference samples)...')
-  results[[samplename]]<-NA
-  #
-  # write BED file of CNVs (is 1-based but irrelevant as only for visualisation)
-  #
-  write.table(NULL, file=sub("[.][^.]*$", ".bed", args[2], perl=TRUE), sep='\t', quote=FALSE)
+  results[[testsample]]<-NA
 }
+
 #
 # knit report (using refsets, results)
 #
 knitrScript<-paste(scriptDirectory, 'exomeDepth.Rnw', sep='/')
-
 if (sub(".*[.]","",args[2],perl=TRUE)=="pdf") {
   knit2pdf(knitrScript, output=sub("[.][^.]*$", ".tex", args[2], perl=TRUE))
 }
