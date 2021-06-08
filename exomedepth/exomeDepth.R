@@ -197,12 +197,16 @@ if (length(refsamplenames)>=3) {
     bed.data[,2]<-bed.data[,2]-1
     write.table(bed.data, file=sub("[.][^.]*$", ".bed", args[2], perl=TRUE), sep='\t', col.names=FALSE, quote=FALSE, row.names=FALSE)
     # write VCF file
-    ed2vcf(results[[testsample]], sub("[.][^.]*$",".vcf",args[2],perl=TRUE), referenceFasta, rois, samplename)
+    if (file.exists(referenceFasta)) {
+      ed2vcf(results[[testsample]], sub("[.][^.]*$",".vcf",args[2],perl=TRUE), referenceFasta, rois, samplename)
+    }
   } else {
     # no results, empty BED and VCF files
     results[[testsample]]<-FALSE  # no CNVs called
     write.table(NULL, file=sub("[.][^.]*$", ".bed", args[2], perl=TRUE), sep='\t', quote=FALSE)
-    ed2vcf(NULL, sub("[.][^.]*$",".vcf",args[2],perl=TRUE), referenceFasta, rois, samplename)
+    if (file.exists(referenceFasta)) {
+      ed2vcf(NULL, sub("[.][^.]*$",".vcf",args[2],perl=TRUE), referenceFasta, rois, samplename)
+    }
   }
 } else {
   message('Skipping ExomeDepth (not enough reference samples)...')
