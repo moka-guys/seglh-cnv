@@ -26,6 +26,7 @@ require(warn.conflicts=FALSE,quietly=FALSE,package="knitr")
 require(warn.conflicts=FALSE,quietly=FALSE,package="kableExtra")
 require(warn.conflicts=FALSE,quietly=FALSE,package="randomForest")
 require(warn.conflicts=FALSE,quietly=FALSE,package="Rsamtools")
+require(warn.conflicts=FALSE,quietly=FALSE,package="stringr")
 source('ed2vcf.R')
 
 #
@@ -119,6 +120,20 @@ if (length(refsamplenames)>=3) {
     coverage.max=apply(counts[,refsamplenames],1,max))
   coverage.table<-coverage.df[which(coverage.df$coverage.median<limits$coverage & coverage.df$exon%in%exonnames),]
 
+  #
+  # check if reference sampole choice has mismatched sex
+  #
+  sexMismatch<-rep(NA,length(refsets[[testsample]]$reference.choice))
+  if (any(rois[,1]=="X") || any(rois[,1]=="X")) {
+    sex<-regex('_[FM]_')
+    # get sex of testsample (ignore undefined)
+    tssx<-str_extract(testsample,sex)
+    rcsx<-str_extract(refsets[[testsample]]$reference.choice,sex)
+    # if sex information available
+    if (!is.na(tssx) && !all(is.na(rcsx))) {
+      sexMismatch<-!(rcsx==tssx)
+    }
+  }
   #
   # prepare reference (sum reference choice)
   #

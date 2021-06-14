@@ -13,6 +13,7 @@ if (!("ExomeDepth" %in% installed.packages())) {
 cat(paste('Loading Packages\n'))
 require(warn.conflicts=FALSE,quietly=TRUE,package="plyr")
 require(warn.conflicts=FALSE,quietly=TRUE,package="ExomeDepth")
+require(warn.conflicts=FALSE,quietly=TRUE,package="stringr")
 
 #
 # configs

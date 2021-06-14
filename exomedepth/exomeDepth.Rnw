@@ -144,11 +144,27 @@ sampleTable<-function(ref) {
     depth.median=c(ref$summary.stats$median.depth[1], diff(ref$summary.stats$median.depth)),
     reference=sapply(ref$summary.stats$ref.samples%in%ref$reference.choice, function(x) ifelse(x,TRUE,FALSE))
   )
+  rs<-refsample.table[which(refsample.table$reference),c(
+    'expected.BF','phi','RatioSd','median.depth','correlations')]
   cat("\\begin{scriptsize}")
-  print(kbl(refsample.table[which(refsample.table$reference),c(
-    'expected.BF','phi','RatioSd','median.depth','correlations')], booktabs=TRUE))
+  # Print warning
+  fnotes<-""
+  ftitle<-""
+  if (any(!is.na(sexMismatch))) {
+    if (any(sexMismatch)) {
+      ftitle<-"Warning:"
+      fnotes<-"Mismatched sex in reference set. CNV calls on sex chromosomes will be unreliable!"
+    } else {
+      fnotes<-"Reference set is sex-matched."
+    }
+  }
+  print(
+    kbl(rs, booktabs=TRUE) %>%
+    row_spec(which(sexMismatch), bold = T, color = "white", background = "red") %>%
+    row_spec(which(!sexMismatch), background = "green") %>%
+    footnote(general=fnotes, general_title=ftitle)
+  )
   cat("\\end{scriptsize}")
-  #cat("\n\\pagebreak")
 }
 lowCoverageExons<-function(pagerows=70) {
   if (nrow(coverage.table)>0) {
@@ -257,7 +273,7 @@ plotRefsampleStats<-function() {
 cat(paste0('\\section{',gsub("_"," ",samplename),'}'))
 cat(paste0('\\textbf{Filename: }', gsub("_"," ",testsample)))
 # qc check (indicates that a QC measure has failed)
-if (any(qc$status!="PASS") || nrow(coverage.table)>0) {
+if (any(qc$status!="PASS") || nrow(coverage.table)>0 || (!is.na(sexMismatch) && sexMismatch)) {
   cat("\\\\")
   qcWarning()
 }

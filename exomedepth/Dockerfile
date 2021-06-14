@@ -38,6 +38,7 @@ RUN tlmgr install framed && \
 	tlmgr install needspace && \
 	tlmgr install dingbat && \
 	tlmgr install booktabs && \
+	tlmgr install makecell && \
 	tlmgr install xcolor
 
 # R dependencies
