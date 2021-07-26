@@ -154,6 +154,7 @@ if (length(testsamplenames)==0) {
 
     # Pick reference sample set
     selectReferenceSet<-function(testsample) {
+      message(paste('Picking reference for',testsample))
       refsamples<-refsamplenames[which(refsamplenames!=testsample)]
       suppressWarnings(select.reference.set(
         test.counts=counts[,testsample],
@@ -167,6 +168,7 @@ if (length(testsamplenames)==0) {
     # statistics output
     stats<-data.frame()
     for (testsample in testsamplenames) {
+        message(paste('Collecting statistics for',testsample))
         d<-cbind(
                  sample=testsample,
                  refsamples=which(refsets[[testsample]]$summary.stats$selected),
