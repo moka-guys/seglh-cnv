@@ -181,6 +181,7 @@ if (length(testsamplenames)==0) {
         rownames(d)<-testsample
         stats<-rbind(stats,d)
     }
+    print(stats)
     write.table(stats, file=sub("[.][^.]*$", ".csv", args[1], perl=TRUE), sep='\t', quote=FALSE, row.names=FALSE)
 
     # save read count table as Rdata
