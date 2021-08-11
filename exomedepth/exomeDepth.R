@@ -106,6 +106,8 @@ if (length(refsamplenames)>=3) {
     coverage=c(100)      # Minimum exon depth (read count)
   )
   predicted_qc<-NA
+  annotations<-NA  # CNV annotations
+  ## load from file
   if (!is.na(args[6])) load(args[6])
 
   #
@@ -205,6 +207,11 @@ if (length(refsamplenames)>=3) {
     # add exon numbers (from subset)
     result.annotated<-AnnotateExtra(x = result, reference.annotation = coveredexons,
       min.overlap = 0.0001, column.name = 'exons.hg19')
+    # add extra annotation
+    if (!is.na(annotations)) {
+      message('Adding extra annotations...')
+      result.annotated<-AnnotateExtra(result.annotated, annotations, 0.1, 'annotation')
+    }
     result.annotated@annotations$name<-as.factor(sapply(strsplit(as.character(result.annotated@annotations$name),'_'),"[[",1))
     results[[testsample]]<-result.annotated
     # write BED file of CNVs

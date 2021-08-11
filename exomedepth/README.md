@@ -144,6 +144,12 @@ docker run -it \
 	/data/normals.RData
 ```
 
+#### Implicit sex matching for PoN
+
+If a PoN is used and target regions are located on sex chromosomes, the readcount step will automatically try to match test samples with normals of the same sex.
+Sex is extracted from input file names (BAM) using the regex `_[MF]_`.
+No sex matching will occur of not all samples in the reference (PoN) and the test sample do not match this regular expression.
+
 ## Integrated Quality Control
 
 The report contains pertinent information for Quality control. Two plots visualise the RPKM correlation with other samples in the same batch, and the coefficient of variation.
@@ -171,11 +177,21 @@ limits<-list(
   maxcor=c(0.95, 0.90),  # max correlation within batch
   refcor=c(0.95, 0.90),  # reference set correlation
   refcount=c(5, 3),      # refernce set size (selected reference samples)
-  coeffvar=c(30, 35)     # coefficient of variation
+  coeffvar=c(30, 35),    # coefficient of variation
+  coverage=c(100)        # Coverage warning threshold
 )
 ```
 
-The `buildQcRfc.R` script contains an example how these can be specified.
+The `configure.R` script contains an example how these can be specified.
+
+### Sex check on reference set
+
+The report will check if test sample and chosen reference samples are sex-matched using the regex `_[MF]_` on the BAM file names.
+
+### Additional annotations for CNVs
+
+Additional annotations of CNVs can be added by generating a configuration file. Any BED4 file supplied to the `configure.R` script will be used to annotation any found and reported CNVs (PDF only).
+CNVs will be annotated if they overlap at least 10 percent with any additional annotation supplied.
 
 ### Random Forest QC classifier
 
@@ -186,7 +202,7 @@ The model can be built as follows:
 
 1. Amend a column with header `status` to the CSV metrics output from the `readCount.R` step.
 2. Label the samples with a known classification (eg. FAIL or PASS) in this column. Providing a label is optional. Missing values will not be included in the model generation.
-3. Build the model with `Rscript buildQcRfc.R qcmodel.RData file1.csv [file2.csv ...]`
+3. Build the model with `Rscript configure.R qcmodel.RData file1.csv [file2.csv ...]`
 4. Supply the `qcmodel.RData` file to the exomedepth command line as last parameter. The report will automaticcly be amended with the RF QC classification and an explanation.
 
 It is recommended to inspect the generated Random Forest classifier in terms of error rate convergence and out-of-bag error. Also consider adjusting of the number of trees!

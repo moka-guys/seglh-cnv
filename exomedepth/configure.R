@@ -7,20 +7,37 @@
 # -----
 # RScript buildQcRfc.R output.RData <csv1> (<csv2> ...)
 
-require(randomForest)
+## install packages
+options(menu.graphics=FALSE)
+options(repos=structure(c(CRAN="http://cran.ma.imperial.ac.uk/")))
+if (!("randomForest" %in% installed.packages())) install.packages("randomForest",dependencies=TRUE)
+# biocmanager
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+BiocManager::install(c('Biostrings','GenomicRanges'))
 
+## load requirements
+require(randomForest)
+require(GenomicRanges)
+
+## parameters for random forest
 ntree<-200
 mtrytune<-TRUE
 
 # read command line args
 args<-commandArgs(trailingOnly=TRUE)
+if (length(args)<2) {
+  stop('No output file specified')
+}
 
 # --- Build Random Forest Classifier ---
 rfc<-NULL
-if (length(args)>1) {
+print(args)
+csvs<-args[which(endsWith(args,'.csv'))]
+beds<-args[which(endsWith(args,'.bed'))]
+if (length(csvs)>0) {
   # read data
   ed<-data.frame()
-  for (csv in args[2:length(args)]) {
+  for (csv in csvs) {
       ed<-rbind(ed,read.table(csv,row.names=1,header=T,fill=TRUE))
   }
   # remove unclassified rows
@@ -47,15 +64,33 @@ if (length(args)>1) {
   print(rfc)
 }
 
+# --- get annotation bed ofiles ---
+annotations<-NA
+if (length(beds)>0) {
+  message('Getting Segment annotations...')
+  ranges<-list()
+  for (bed in beds) {
+    ranges[[bed]]<-with(read.table(bed,header=FALSE), GRanges(seqnames = V1, IRanges(start=V2+1, end=V3, names=V4),names=gsub("_"," ",V4)))  # BED FILE 0-based
+  }
+  annotations<-unlist(as(ranges, "GRangesList"))
+}
 # --- QC threshold overrides (edit as needed) ---
+# limits<-list(
+#   medcor=c(NA, 0.90),   # median correlation within batch
+#   maxcor=c(0.95, 0.90), # max correlation within batch
+#   refcor=c(0.95, 0.90), # reference set correlation
+#   refcount=c(3,1),      # refernce set size (selected reference samples)
+#   coeffvar=c(30, 35),   # coefficient of variation
+#   coverage=c(100)       # exon coverage limit
+# )
 limits<-list(
   medcor=c(NA, 0.90),   # median correlation within batch
   maxcor=c(0.95, 0.90), # max correlation within batch
   refcor=c(0.95, 0.90), # reference set correlation
   refcount=c(3,1),      # refernce set size (selected reference samples)
-  coeffvar=c(30, 35),   # coefficient of variation
+  coeffvar=c(120, 150), # coefficient of variation
   coverage=c(100)       # exon coverage limit
 )
 
 # save model
-save(list=c("rfc","limits"), file=args[1])
+save(list=c("rfc","limits","annotations"), file=args[1])
