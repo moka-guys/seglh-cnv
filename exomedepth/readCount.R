@@ -20,6 +20,7 @@ require(warn.conflicts=FALSE,quietly=TRUE,package="stringr")
 #
 normalprefix<-'NORMAL'
 cmp.cols<-3
+sex<-regex('_[MF]_')
 
 #
 # READ ARGS
@@ -155,7 +156,19 @@ if (length(testsamplenames)==0) {
     # Pick reference sample set
     selectReferenceSet<-function(testsample) {
       message(paste('Picking reference for',testsample))
+      # exclude test sample
       refsamples<-refsamplenames[which(refsamplenames!=testsample)]
+      # if PoN && XY && Sex -> sex match
+      hasPon<-length(normals)>0
+      hasXY<-any(rois[,1]=="X") || any(rois[,1]=="Y")
+      tssx<-str_extract(testsample,sex)
+      rcsx<-str_extract(refsamples,sex)
+      hasSex<-!(is.na(tssx) || any(is.na(rcsx)))
+      if (hasPon && hasXY && hasSex) {
+        message(paste('Enforcing sex match of', testsample, 'to reference'))
+        refsamples<-refsamples[which(rcsx==tssx)]
+      }
+      # pick reference  
       suppressWarnings(select.reference.set(
         test.counts=counts[,testsample],
         reference.counts=as.matrix(counts[,refsamples]),
