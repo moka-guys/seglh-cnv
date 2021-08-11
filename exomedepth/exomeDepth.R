@@ -124,7 +124,7 @@ if (length(refsamplenames)>=3) {
   # check if reference sampole choice has mismatched sex
   #
   sexMismatch<-rep(NA,length(refsets[[testsample]]$reference.choice))
-  if (any(rois[,1]=="X") || any(rois[,1]=="X")) {
+  if (any(rois[,1]=="X") || any(rois[,1]=="Y")) {
     sex<-regex('_[FM]_')
     # get sex of testsample (ignore undefined)
     tssx<-str_extract(testsample,sex)
