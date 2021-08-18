@@ -68,6 +68,7 @@ message(paste('   Original BAM:',testsample))
 message(paste('     SampleName:',samplename))
 message(paste('  Normalisation:',normalisation.method))
 message(paste('    Ref samples:',length(refsamplenames[which(testsample!=refsamplenames)])))
+message(paste('         Extras:',args[6]))
 
 #
 # Check if testsample in refsamples
@@ -203,14 +204,17 @@ if (length(refsamplenames)>=3) {
   # annotate results
   print(paste('Raw CNV count:',length(result@CNV.calls)))
   message('Annotating CNVs...')
+  exon_overlap_frac<-0.000000001  # 1bp/1Gb, basically any overlap
+  extra_overlap_frac<-0.1  # 1bp/10bp (only valid for if annotation is large known SegDups)
   if (length(result@CNV.calls)>0) {
     # add exon numbers (from subset)
     result.annotated<-AnnotateExtra(x = result, reference.annotation = coveredexons,
-      min.overlap = 0.0001, column.name = 'exons.hg19')
+      min.overlap = exon_overlap_frac, column.name = 'exons.hg19')
     # add extra annotation
     if (!is.na(annotations)) {
       message('Adding extra annotations...')
-      result.annotated<-AnnotateExtra(result.annotated, annotations, 0.1, 'annotation')
+      result.annotated<-AnnotateExtra(x = result.annotated, reference.annotation = annotations,
+                                      min.overlap = extra_overlap_frac, column.name = 'annotation')
     }
     result.annotated@annotations$name<-as.factor(sapply(strsplit(as.character(result.annotated@annotations$name),'_'),"[[",1))
     results[[testsample]]<-result.annotated
