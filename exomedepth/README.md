@@ -146,7 +146,7 @@ docker run -it \
 
 #### Minimal reference count for PoN
 If the maximum Bayes Factor (BF) of the selected reference set is for a single reference sample, the next higher BF will be selected. This forces the reference to be composed of at least 2 reference samples and sacrifices some statistical power for enhanced specificity (lower FNR and FPR).
-If this rule is applied it will be highlighted on the final report.
+If this rule is applied it will be highlighted on the QC report.
 
 #### Implicit sex matching for PoN
 
@@ -182,7 +182,9 @@ limits<-list(
   refcor=c(0.95, 0.90),  # reference set correlation
   refcount=c(5, 3),      # refernce set size (selected reference samples)
   coeffvar=c(30, 35),    # coefficient of variation
-  coverage=c(100)        # Coverage warning threshold
+  coverage=c(100),       # Coverage warning threshold
+  expectedbf=c(5.0, NA), # expected BF of reference choice (power)
+  minrefs=c(2,Inf)       # minimum reference set size
 )
 ```
 

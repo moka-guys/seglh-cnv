@@ -25,7 +25,7 @@ mtrytune<-TRUE
 
 # read command line args
 args<-commandArgs(trailingOnly=TRUE)
-if (length(args)<2) {
+if (length(args)<1) {
   stop('No output file specified')
 }
 
@@ -79,17 +79,19 @@ if (length(beds)>0) {
 #   medcor=c(NA, 0.90),   # median correlation within batch
 #   maxcor=c(0.95, 0.90), # max correlation within batch
 #   refcor=c(0.95, 0.90), # reference set correlation
-#   refcount=c(3,1),      # refernce set size (selected reference samples)
+#   refcount=c(3,1),      # reference set size (selected reference samples)
 #   coeffvar=c(30, 35),   # coefficient of variation
 #   coverage=c(100)       # exon coverage limit
 # )
 limits<-list(
-  medcor=c(NA, 0.90),   # median correlation within batch
-  maxcor=c(0.95, 0.90), # max correlation within batch
-  refcor=c(0.95, 0.90), # reference set correlation
-  refcount=c(3,1),      # refernce set size (selected reference samples)
-  coeffvar=c(120, 150), # coefficient of variation
-  coverage=c(100)       # exon coverage limit
+  medcor=c(NA, 0.90),    # median correlation within batch
+  maxcor=c(0.95, 0.90),  # max correlation within batch
+  refcor=c(0.95, 0.90),  # reference set correlation
+  refcount=c(3,1),       # reference set size (selected reference samples)
+  coeffvar=c(120, 150),  # coefficient of variation
+  coverage=c(100),       # exon coverage limit
+  expectedbf=c(5.0, NA), # expected BF
+  minrefs=c(2,Inf)       # minimum reference set size
 )
 
 # save model

@@ -128,6 +128,15 @@ qcTable<-function() {
       footnotes<-append(footnotes,
         "The low number of reference samples could limit assay sensitivity if they contain the same alterations!")
     }
+    if (6%in%failed) {
+      footnotes<-append(footnotes,c(
+        "The size of the reference set was adjusted to be greater than 1 to preserve specificity,",
+        "  check selected reference samples for expected BF and correlation."))
+    }
+    if (7%in%failed) {
+      footnotes<-append(footnotes,
+        "The expected BF for the chosen reference is low, indicating limited power of the statistical model.")
+    }
   }
   print(
     kbl(qc,escape=T,booktabs=T) %>%
@@ -295,25 +304,26 @@ if (suppressWarnings(is.na(results[[testsample]]))) {
     cat('\n\n\n')
     cat("\\textbf{NO CNVs CALLED.}")
   } else {
-    # filter CNVs (sort by BF and remove negative BF and unannotated)
+    # # filter CNVs (sort by BF and remove negative BF and unannotated)
     cnvs<-results[[testsample]]@CNV.calls
     cnvs<-cnvs[order(cnvs$BF, decreasing = TRUE),]
     cnvs<-cnvs[which(cnvs$BF>0),]
     cnvs<-cnvs[which(not.na(cnvs$exons.hg19)),]
-    # rewrite gene+exons string
-    cnvs[,'genes']<-unlist(lapply(cnvs[,'exons.hg19'],summarizeGene))
-    cnvs[,'confidence']<-CNVconfidence(cnvs)
-    # add empty annotation if none set
-    hasAnnotation<-"annotation"%in%colnames(cnvs)
-    if (hasAnnotation){
-      # deduplicate and replace NA with empty string
-      cnvs[,'annotation']<-unlist(lapply(cnvs[,'annotation'],summarizeAnnotation))
-    } else {
-      # make all annotations an empty string instead of plotting NA
-      cnvs[,'annotation']<-""
-    }
-    # print CNV table
+    # render CNV data
     if (!!nrow(cnvs)) {
+      # reformat metadata and annotate
+      cnvs[,'genes']<-unlist(lapply(cnvs[,'exons.hg19'],summarizeGene))
+      cnvs[,'confidence']<-CNVconfidence(cnvs)
+      # add empty annotation if none set
+      hasAnnotation<-"annotation"%in%colnames(cnvs)
+      if (hasAnnotation) {
+        # deduplicate and replace NA with empty string
+        cnvs[,'annotation']<-unlist(lapply(cnvs[,'annotation'],summarizeAnnotation))
+      } else {
+        # make all annotations an empty string instead of plotting NA
+        cnvs[,'annotation']<-""
+      }
+      # create CNV table
       cnvtable<-cnvs[,c('id','BF','reads.expected','reads.ratio',
                         'type','genes','confidence','annotation')]
       colnames(cnvtable)<-c('id','BF¹','expected','ratio',
@@ -328,7 +338,7 @@ if (suppressWarnings(is.na(results[[testsample]]))) {
       cat("\\end{multicols*}\n")
     } else {
       cat('\n\n\n')
-      cat("\\textbf{NO CNVs CALLED.}\n")
+      cat("\\textbf{NO CNVs CALLED IN REGION OF INTEREST.}\n")
     }
   }
 }

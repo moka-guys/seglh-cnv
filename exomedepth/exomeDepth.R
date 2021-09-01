@@ -48,12 +48,15 @@ threshold<-as.numeric(unlist(strsplit(args[5],':'))[3]) # Threshold set in ngs_c
 if(is.na(threshold)) {
     threshold<-10^-4
 }
+message(paste("Transition threshold set at:",threshold))
+
 # version report header
 argversion<-args[1]
 versionfile<-paste(scriptDirectory,'VERSION', sep='/')
 pipeversion<-ifelse(file.exists(versionfile),
                     paste(argversion,readChar(versionfile,7),sep="-"),
                     argversion)
+message(paste('Running',pipeversion))
 
 # loads counts,samplenames,rois (extended exons.hg19)
 load(args[4])
@@ -99,12 +102,14 @@ if (length(refsamplenames)>=3) {
   # set defaults and load QC limits (override)
   #
   limits<-list(
-    medcor=c(NA, 0.90),   # median correlation within batch
-    maxcor=c(0.95, 0.90), # max correlation within batch
-    refcor=c(0.95, 0.90), # reference set correlation
-    refcount=c(3,1),      # refernce set size (selected reference samples)
-    coeffvar=c(30, 35),   # coefficient of variation
-    coverage=c(100)      # Minimum exon depth (read count)
+    medcor=c(NA, 0.90),    # median correlation within batch
+    maxcor=c(0.95, 0.90),  # max correlation within batch
+    refcor=c(0.95, 0.90),  # reference set correlation
+    refcount=c(3,1),       # refernce set size (selected reference samples)
+    coeffvar=c(30, 35),    # coefficient of variation
+    coverage=c(100),       # Minimum exon depth (read count)
+    expectedbf=c(5.0, NA), # expected BF
+    minrefs=c(2,Inf)       # minimum reference set size
   )
   predicted_qc<-NA
   annotations<-NA  # CNV annotations
@@ -173,16 +178,21 @@ if (length(refsamplenames)>=3) {
     decide(stats[testsample,"batch.maxcor"],limits$maxcor),
     decide(stats[testsample,"coeff.var"],limits$coeffvar),
     decide(ref.correlation, limits$refcor),
-    decide(length(refsets[[testsample]]$reference.choice),limits$refcount)
+    decide(stats[testsample,"refsamples"],limits$refcount),
+    decide(stats[testsample,"min.refs"], limits$minrefs),
+    decide(stats[testsample,"expected.BF"],limits$expectedbf)
   )
   rownames(qc)=c(
             "Median correlation in batch",
             "Maximum correlation in batch",
             "Coefficient of variation",
             "Correlation with reference",
-            "Size of reference set"
+            "Size of reference set",
+            "Forced minimum reference set size",
+            "Expected BF with reference"
   )
   qc<-as.data.frame(qc)
+  print(qc)
 
   #
   # run exome depth
