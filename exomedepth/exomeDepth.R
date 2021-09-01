@@ -46,9 +46,8 @@ testsample<-basename(unlist(strsplit(args[5],':'))[1])  # RGID
 samplename<-as.character(unlist(strsplit(args[5],':'))[2]) # RGSM
 threshold<-as.numeric(unlist(strsplit(args[5],':'))[3]) # Threshold set in ngs_config
 if(is.na(threshold)) {
-    threshold<-10^-4
+    threshold<-10^-3
 }
-message(paste("Transition threshold set at:",threshold))
 
 # version report header
 argversion<-args[1]
