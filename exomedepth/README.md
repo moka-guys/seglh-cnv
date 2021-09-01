@@ -144,6 +144,10 @@ docker run -it \
 	/data/normals.RData
 ```
 
+#### Minimal reference count for PoN
+If the maximum Bayes Factor (BF) of the selected reference set is for a single reference sample, the next higher BF will be selected. This forces the reference to be composed of at least 2 reference samples and sacrifices some statistical power for enhanced specificity (lower FNR and FPR).
+If this rule is applied it will be highlighted on the final report.
+
 #### Implicit sex matching for PoN
 
 If a PoN is used and target regions are located on sex chromosomes, the readcount step will automatically try to match test samples with normals of the same sex.

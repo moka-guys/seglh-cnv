@@ -21,7 +21,7 @@ require(warn.conflicts=FALSE,quietly=TRUE,package="stringr")
 normalprefix<-'NORMAL'
 cmp.cols<-3
 sex<-regex('_[MF]_')
-
+min.refs<-2
 #
 # READ ARGS
 #
@@ -81,14 +81,17 @@ bam<-bam[bams.to.count]
 #
 # generate read counts from BAM files for all exons
 #
-suppressWarnings(counts.computed <- getBamCounts(
-                            bed.frame = rois,
-                            bam.files = bam,
-                            min.mapq = 10,
-                            include.chr = FALSE,  # chrom start with chr prefix
-                            referenceFasta = referenceFasta))
-counts.computed<-as(counts.computed, 'data.frame')
-
+print(bam)
+counts.computed<-NA
+if (length(bam)>0) {
+    suppressWarnings(counts.computed <- getBamCounts(
+                                bed.frame = rois,
+                                bam.files = bam,
+                                min.mapq = 10,
+                                include.chr = FALSE,  # chrom start with chr prefix
+                                referenceFasta = referenceFasta))
+    counts.computed<-as(counts.computed, 'data.frame')
+}
 
 #
 # add precomputed counts (normals only)
@@ -97,14 +100,21 @@ for (c in pcn) {
     # import precomputed normals
     attach(c)
     targets.imported<-counts[,c(1:cmp.cols)]
-    counts.imported<-counts[,which(startsWith(colnames(counts),normalprefix))]
+    # counts.imported<-counts[,which(startsWith(colnames(counts),normalprefix))]
+    counts.imported<-counts
     detach()
     # if compatible normals, amend counts table
-    targets.same<-all.equal(counts.computed[,c(1:cmp.cols)], targets.imported)
-    if (targets.same && ncol(counts.imported)>0) {
-        counts.computed<-cbind(counts.computed,counts.imported)
+    if (!is.na(counts.computed)) {
+        targets.same<-all.equal(counts.computed[,c(1:cmp.cols)], targets.imported)
+        if (targets.same && ncol(counts.imported)>0) {
+            counts.computed<-cbind(counts.computed,counts.imported)
+        } else {
+            message(paste('ERROR: Supplied count data not compatible',c))
+        }
     } else {
-        message(paste('ERROR: Supplied count data not compatible',c))
+        message('No computed read depth data, using supplied counts')
+        # no computed counts -> just use imported from RData file
+        counts.computed<-counts.imported
     }
 }
 counts<-counts.computed
@@ -136,8 +146,7 @@ if (length(normals)>0) {
 if (length(testsamplenames)==0) {
     message('Creating Panel of Normals (PoN)...')
     # save normal counts
-    save(list=c(
-                "refsamplenames",  # supplied normals
+    save(list=c("refsamplenames",  # supplied normals
                 "counts"),         # normal counts
          file = args[1])
 } else {
@@ -145,7 +154,6 @@ if (length(testsamplenames)==0) {
     # Calculate RPKM
     calcRPKM<-function(c,l) c/(l*sum(c)/10^6)
     counts.len<-counts$end-counts$start+1
-
     rpkm<-apply(counts[,testsamplenames],2,function(x) calcRPKM(x,counts.len))
 
     # Calculate batch statistics (all samples excluding normals if any)
@@ -155,25 +163,49 @@ if (length(testsamplenames)==0) {
 
     # Pick reference sample set
     selectReferenceSet<-function(testsample) {
-      message(paste('Picking reference for',testsample))
-      # exclude test sample
-      refsamples<-refsamplenames[which(refsamplenames!=testsample)]
-      # if PoN && XY && Sex -> sex match
-      hasPon<-length(normals)>0
-      hasXY<-any(rois[,1]=="X") || any(rois[,1]=="Y")
-      tssx<-str_extract(testsample,sex)
-      rcsx<-str_extract(refsamples,sex)
-      hasSex<-!(is.na(tssx) || any(is.na(rcsx)))
-      if (hasPon && hasXY && hasSex) {
-        message(paste('Enforcing sex match of', testsample, 'to reference'))
-        refsamples<-refsamples[which(rcsx==tssx)]
-      }
-      # pick reference  
-      suppressWarnings(select.reference.set(
-        test.counts=counts[,testsample],
-        reference.counts=as.matrix(counts[,refsamples]),
-        bin.length=(counts$end - counts$start)
-      ))
+        message(paste('Picking reference for',testsample))
+        # exclude test sample
+        refsamples<-refsamplenames[which(refsamplenames!=testsample)]
+        # if PoN && XY && Sex -> sex match
+        hasPon<-length(normals)>0
+        hasXY<-any(rois[,1]=="X") || any(rois[,1]=="Y")
+        tssx<-str_extract(testsample,sex)
+        rcsx<-str_extract(refsamples,sex)
+        hasSex<-!(is.na(tssx) || any(is.na(rcsx)))
+        if (hasPon && hasXY && hasSex) {
+            message(paste('Enforcing sex match of', testsample, 'to reference'))
+            refsamples<-refsamples[which(rcsx==tssx)]
+        }
+        # pick reference  
+        suppressWarnings(selected<-select.reference.set(
+            test.counts=counts[,testsample],
+            reference.counts=as.matrix(counts[,refsamples]),
+            bin.length=(counts$end - counts$start)
+        ))
+        # if not enough reference samples and PoN mode, enlarge reference set
+        # -> accept lower power in favour of specificity
+        ref.count<-which(selected$summary.stats$selected)
+        if (hasPon && ref.count < min.refs) {
+            # create new df
+            new.summary.stats <- selected$summary.stats
+            new.summary.stats$selected <- FALSE
+            # get row with highest expected.BF after min.refs rows
+            BF.ranks <- order(new.summary.stats$expected.BF, decreasing=T, na.last=T)
+            best.BF.rank <- which.min(BF.ranks[min.refs:length(BF.ranks)])+min.refs-1
+            # mark selected row 
+            new.summary.stats$selected[best.BF.rank] <- TRUE
+            # build new selected reference
+            new.selected <- list(
+                reference.choice = as.character(new.summary.stats$ref.samples[1:best.BF.rank]),
+                summary.stats = new.summary.stats,
+                min.refs = min.refs)
+            message(paste('Enlarged reference set:',ref.count,'=>', best.BF.rank))
+            selected<-new.selected
+        } else {
+            message(paste('Reference set size:',ref.count))
+            selected$min.refs<-1
+        }
+        selected
     }
     refsets<-lapply(testsamplenames, selectReferenceSet)
     names(refsets)<-testsamplenames
@@ -184,6 +216,7 @@ if (length(testsamplenames)==0) {
         message(paste('Collecting statistics for',testsample))
         d<-cbind(
                  sample=testsample,
+                 min.refs=refsets[[testsample]]$min.refs,
                  refsamples=which(refsets[[testsample]]$summary.stats$selected),
                  refsets[[testsample]]$summary.stats[which(refsets[[testsample]]$summary.stats$selected),
                                         c('correlations','expected.BF','phi','RatioSd','mean.p','median.depth')],
