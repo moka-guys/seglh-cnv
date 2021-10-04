@@ -19,21 +19,94 @@ if (!("ExomeDepth" %in% installed.packages())) {
 cat(paste('Loading Packages\n'))
 require(warn.conflicts=FALSE,quietly=FALSE,package="GenomicRanges")
 require(warn.conflicts=FALSE,quietly=FALSE,package="ExomeDepth")
-require(warn.conflicts=FALSE,quietly=FALSE,package="randomForest")
 require(warn.conflicts=FALSE,quietly=FALSE,package="Rsamtools")
+require(warn.conflicts=FALSE,quietly=TRUE,package="stringr")
+require(warn.conflicts=FALSE,quietly=TRUE,package="dplyr")
+require(warn.conflicts=FALSE,quietly=TRUE,package="moments")
 
+#
+# configs
+#
+sex<-regex('_[MF]_')
+'%nin%' <- function(x,y)!('%in%'(x,y))
+# shannon entropy to determine common CNVs
+entropy<-function(target) {
+  freq<-table(target)/length(target)
+  vec<-as.data.frame(freq)[,2]
+  vec<-vec[vec>0]
+  -sum(vec * log2(vec))
+}
 #
 # READ ARGS
 #
-# inferNormals.R
-#   readCount.RData
-
 args<-commandArgs(trailingOnly = TRUE)
 setwd(dirname(args[1]))  # set working directory to target directory
 load(args[1])
-tries<-ifelse(is.na(args[2]),1,as.numeric(args[2]))
-from<-ifelse(is.na(args[3]),1,as.numeric(args[3]))
-to<-ifelse(is.na(args[4]),length(testsamplenames),as.numeric(args[4]))
+args<-commandArgs(trailingOnly = TRUE)
+tries<-ifelse(!is.na(as.numeric(args[2])), as.numeric(args[2]), 100)
+samplesize<-ifelse(!is.na(as.numeric(args[3])), as.numeric(args[3]), 30)
+from<-ifelse(!is.na(as.numeric(args[4])), as.numeric(args[4]), 1)
+to<-ifelse(!is.na(as.numeric(args[5])), as.numeric(args[5]), length(testsamplenames))
+
+# load BED files to mark overlaps with known CNVs
+beds<-args[which(endsWith(args,'.bed'))]
+annotations<-NULL
+if (length(beds)>0) {
+  message('Getting Segment annotations...')
+  ranges<-list()
+  for (bed in beds) {
+    ranges[[bed]]<-with(
+      read.table(bed,header=FALSE,fill=TRUE),
+      GRanges(seqnames = V1, IRanges(start=V2+1, end=V3)))  # BED FILE 0-based
+  }
+  annotations<-unlist(as(ranges, "GRangesList"))
+}
+
+#
+# perform pre-filtering if scores files supplied
+#
+score_files<-args[which(endsWith(args,'.scores'))]
+remove<-NULL
+if (length(score_files)>0) {
+  proceed<-length(args[which(args=='RUN')])!=0
+  message('Analysing previous runs...')
+  scores<-read.table(score_files[1],header=FALSE)
+  if (length(score_files)>1) for (s in 2:length(score_files)) scores<-rbind(scores, read.table(score_files[s]))
+  colnames(scores)<-c('sample','exon','type','prop','common')
+  # exclude common CNVs
+  print(nrow(scores))
+  scores<-scores[which(is.na(scores$common) | !scores$common),]
+  print(scores)
+  # remove high-entropy, high-prevalence exons (likely common CNVs)
+  scores %>% 
+    group_by(exon) %>%
+    summarise(entropy=entropy(prop), skewness=skewness(prop), n=n(), prevalence=n()/length(testsamplenames)) -> 
+    exon.entropy
+  exon.entropy %>% print(n=Inf)
+  exon.entropy %>% filter(entropy>2 & prevalence>0.4) %>% pull(exon) -> common
+  print(common)
+  scores<-scores[which(scores$exon%nin%common),]
+  # get samples with CNVs over 0.5 abundance in bootstrapped set (likely true CNVs)
+  scores<-scores[which(scores$prop>0.5),]
+  exclusions<-unique(scores$sample)
+  if (length(exclusions)==0) {
+    stop("Good set of normals already")
+  } else {
+    print(scores)
+    print(paste0('Will exclude the following ', length(exclusions), '/', length(testsamplenames),' samples:'))
+    print(exclusions)
+    if (!proceed) stop('To proceed, run same command and append RUN as an argument')
+    # remove samples and proceed as normally
+    testsamplenames<-testsamplenames[which(testsamplenames%nin%exclusions)]
+    refsamplenames<-testsamplenames
+  }
+}
+
+#
+# read range of samples to bootstrap
+#
+from<-ifelse(!is.na(as.numeric(args[4])), as.numeric(args[4]), 1)
+to<-ifelse(!is.na(as.numeric(args[5])), as.numeric(args[5]), length(testsamplenames))
 
 #
 # print what will be printed
@@ -51,7 +124,6 @@ if (!all(refsamplenames==testsamplenames)) {
 #
 # run if enough samples
 #
-results<-list()
 cnvcount<-vector()
 refcount<-vector()
 passed<-vector()
@@ -66,30 +138,53 @@ exons<-GRanges(seqnames = rois$chromosome,
   IRanges(start=rois$start,end=rois$end),
   names = rois$name)
 
-score.dups<-vector()
-names.dups<-vector()
-score.dels<-vector()
-names.dels<-vector()
+timestamp<-format(Sys.time(), "%y%m%d%H%M%S")
+cnv.file<-sub("[.][^.]*$", paste0(".",timestamp,".scores"), args[1], perl=TRUE)
+data.file<-sub("[.][^.]*$", paste0(".",timestamp,".RData"), args[1], perl=TRUE)
 for (testsample in testsamplenames[from:to]) {
   print(paste(i+from,to,sep='/'))
   i<-i+1
+  # results
   samplecnvs<-data.frame()
+  results<-data.frame(name=character(), exon=character(), type=character(), prop=numeric(), common=logical())
+  #
+  # get refsamples
+  #
+  refsamples<-refsamplenames[which(refsamplenames!=testsample)]
+  print(refsamplenames)
+  #
+  # pick reference sample (sex-matched)
+  #
+  hasXY<-any(rois[,1]=="X") || any(rois[,1]=="Y")
+  tssx<-str_extract(testsample,sex)
+  rcsx<-str_extract(refsamples,sex)
+  hasSex<-!(is.na(tssx) || any(is.na(rcsx)))
+  if (hasXY && hasSex) {
+    refsamples<-refsamples[which(rcsx==tssx)]
+    print(paste('==> SEX_MATCHED SAMPLING', samplesize, 'of', length(refsamples)))
+  } else {
+    print(paste('==> SAMPLING', samplesize, 'of', length(refsamples)))
+  }
+  #
+  # run boostrap
+  #
   for (t in 1:tries) {
+    print(paste('**', t, 'of', tries))
     #
-    # pick reference
+    # sample with replacement
     #
-    refsamples<-refsamplenames[which(refsamplenames!=testsample)]
-    if (tries>1) refsamples<-sample(refsamples,floor(length(refsamples)/tries))
+    refsamples.sample<-sample(refsamples,samplesize,replace=TRUE)
+    refcounts<-as.matrix(counts[,refsamples.sample])
     refset<-suppressWarnings(select.reference.set(
       test.counts=counts[,testsample],
-      reference.counts=as.matrix(counts[,refsamples]),
+      reference.counts=refcounts,
       bin.length=(counts$end - counts$start)
     ))
     #
     # prepare reference (sum reference choice)
     #
     reference.selected<-apply(
-      X = as.matrix(counts[, refset$reference.choice, drop = FALSE]),
+      X = as.matrix(refcounts[, refset$reference.choice, drop = FALSE]),
       MAR = 1, FUN = sum)
     reference.selected<-as.vector(reference.selected)
     #
@@ -111,57 +206,32 @@ for (testsample in testsamplenames[from:to]) {
                     end =counts$end,
                     name = counts$exon)
     if (length(result@CNV.calls)>0) {
+      print(result@CNV.calls)
       cnvs<-result@CNV.calls[result@CNV.calls[,9]>0,]
       if (nrow(cnvs)>0) samplecnvs<-rbind(samplecnvs,cnvs[,c(1,2,9,10,11,12)])
     }
   }
-  dups<-table(unlist(apply(samplecnvs[which(samplecnvs[,6]>1),], 1, function(x) x[1]:x[2])))==tries
-  score.dups<-append(score.dups,length(names(dups)[which(dups)]))
-  names.dups<-append(names.dups,paste(names(dups)[which(dups)],collapse=","))
-  dels<-table(unlist(apply(samplecnvs[which(samplecnvs[,6]<1),], 1, function(x) x[1]:x[2])))==tries
-  score.dels<-append(score.dels,length(names(dels)[which(dels)]))
-  names.dels<-append(names.dels,paste(names(dels)[which(dels)],collapse=","))
-
-  # annotate
-  # if (length(result@CNV.calls)>0) {
-  #   # add exon numbers (from subset)
-  #   result<-AnnotateExtra(
-  #     x = result,
-  #     reference.annotation = exons,
-  #     min.overlap = 0.0001,
-  #     column.name = 'exons.hg19')
-  #   result@annotations$name<-as.factor(sapply(strsplit(as.character(result@annotations$name),'_'),"[[",1))
-  #   # write BED file of CNVs
-  #   cnv<-result@CNV.calls[which(result@CNV.calls[,9]>0),]
-  #   bed.data<-rbind(bed.data,cbind(cnv,sample=testsample))
-  # }
-  # filter by sex match
-  # sex<-unlist(strsplit(testsample,'_'))[3]
-  # refsex<-sapply(strsplit(refsets[[testsample]]$reference.choice,'_'),function(x) x[3])
-  # if (all(refsex==sex)) {
-  #   results[[testsample]]<-result
-  #   cnvcount<-append(cnvcount,nrow(result@CNV.calls[which(result@CNV.calls$BF>10),]))
-  #   refcount<-append(refcount,length(refsets[[testsample]]$reference.choice))
-  # }
-  # for (r in refsets[[testsample]]$reference.choice) {
-  #   ref.data<-rbind(ref.data,c(testsample,r))
-  # }
+  print('************')
+  print(samplecnvs)
+  print('************')
+  if (nrow(samplecnvs)>0) {
+    dups<-table(unlist(apply(samplecnvs[which(samplecnvs$reads.ratio>1),], 1, function(x) x[1]:x[2])))/tries
+    dels<-table(unlist(apply(samplecnvs[which(samplecnvs$reads.ratio<1),], 1, function(x) x[1]:x[2])))/tries
+    for (roi in unique(c(names(dups),names(dels)))) {
+      exon.name<-exons$names[as.numeric(roi)]
+      cnvs.ovp<-ifelse(is.null(annotations), NA, overlapsAny(exons[as.numeric(roi)],annotations))
+      print(paste("** aggregating", roi))
+      # aggregate data
+      if (!is.na(dups[roi])) {
+        dups.result<-data.frame(name=testsample, exon=exon.name, type="duplication", prop=as.vector(dups[roi]), common=cnvs.ovp)
+        results<-rbind(results,dups.result)
+      }
+      if (!is.na(dels[roi])) {
+        dels.result<-data.frame(name=testsample, exon=exon.name, type="deletion", prop=as.vector(dels[roi]), common=cnvs.ovp)
+        results<-rbind(results,dels.result)
+      }
+    }
+    write.table(results, file=cnv.file, sep='\t', col.names=FALSE, quote=FALSE, row.names=FALSE, append=TRUE)
+    save.image(data.file)
+  }
 }
-
-# stable CNV score
-result<-data.frame(
-  sample=testsamplenames[from:to],
-  score.dups=score.dups,
-  score.dels=score.dels,
-  names.dups=names.dups,
-  names.dels=names.dels)
-cnv.file<-sub("[.][^.]*$", ".scores", args[1], perl=TRUE)
-write.table(result, file=cnv.file, sep='\t', col.names=FALSE, quote=FALSE, row.names=FALSE, append=TRUE)
-# CNV
-# write.table(bed.data, file=sub("[.][^.]*$", ".bed", args[1], perl=TRUE), sep='\t', col.names=FALSE, quote=FALSE, row.names=FALSE)
-# LINKS
-# ref.file<-sub("[.][^.]*$", ".refs", args[1], perl=TRUE)
-# write.table(ref.data, file=ref.file, sep='\t', col.names=FALSE, quote=FALSE, row.names=FALSE)
-# save image
-# data.file<-sub("[.][^.]*$", ".out.RData", args[1], perl=TRUE)
-# save.image(data.file)

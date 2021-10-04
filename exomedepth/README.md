@@ -212,3 +212,50 @@ The model can be built as follows:
 4. Supply the `qcmodel.RData` file to the exomedepth command line as last parameter. The report will automaticcly be amended with the RF QC classification and an explanation.
 
 It is recommended to inspect the generated Random Forest classifier in terms of error rate convergence and out-of-bag error. Also consider adjusting of the number of trees!
+
+## Bootstrapping a set of normal samples
+
+Often the complete negative status of a potential normal sample is not known. the `bootstrapCnv.R` script allows to bootstrap CNVs from a pool of likely-normals which then can be used to exclude samples which do not meet user set criteria for being a normal sample (eg presence of no CNVs in a certain region).
+
+### Process
+
+The following steps are recommended to further reduce a set of likely-normals to a more stringent set of normals, by excluding samples that do have reproducible CNVs in a within-batch normalisation approach.
+
+The `getNormals.sh` script implements an example of the steps below.
+
+#### Read counting for pool of normals
+
+Run the readcount step as normal supplying the PoN candidates.
+
+#### Bootstrap CNVs
+
+Run the resampling script. As default, 30 samples are picked from the pool 100 times, for all samples in sequence. For large sets of normals, the runs can be split into multiple parallel runs by specifying start and end samples.
+
+`Rscript bootstrapCnv.R readcounts.RData [BOOTSTRAP:100] [SAMPLESIZE:30] [FROM:1] [TO:samplecount]`
+
+A BED file with known highly variable regions (common CNVs) can be supplied as the last argument.
+
+The output files are named according to the input file and time stamped:
+
+- `readcounts.210912T130216.scores` - The CNVs from all runs (aggregated)
+- `readcounts.210912T130216.RData` - Saved state 
+
+#### Filtering
+
+The user can either manuall assess the returned bootstrapped CNV calls or rely on the integrated filtering.
+The filtering aims to identify samples that have hghly reproducible CNV calls and therefore do not meet the normal expectation.
+
+To run the filtering, supply a previous _scores_ file to the command line:
+
+`Rscript bootstrapCnv.R readcounts.210912T130216.RData 100 30 readcounts.210912T130216.scores`
+
+The following filter steps are applied in order:
+
+1. Remove any common CNVs (according to supplied BED file)
+2. Remove CNVs with high entropy (>2) and prevalence (>0.4) in the bootstrap (highly variable CNVs)
+3. Remove CNVs with less than 0.5 bootstrap frequency (unstable CNVs or noise).
+
+The excluded samples are printed. If these are considered appropriate, one can rerun the bootrapping processing while excluding htese samples by appending `RUN` as an additional argument.
+
+This process can be iterated multiple times. However, this does not prevent from overfitting the normal set.
+
