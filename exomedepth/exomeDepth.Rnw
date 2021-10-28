@@ -57,6 +57,7 @@ cat(paste(c("\\lhead{ExomeDepth ",gsub("_"," ",pipeversion),"}"),collate="",sep=
 (\Sexpr{gsub("_"," ",panel[1])}) \\
 \textbf{Genes:} \Sexpr{paste(selected.genes[order(selected.genes)],collapse=", ")}
 (\Sexpr{gsub("_"," ",length(coveredexons@ranges))} exons) \\
+\textbf{Reference genome:} \Sexpr{paste(basename(referenceFasta))} \\
 \textbf{Normalisation method:} \Sexpr{paste(normalisation.method)} \\
 \textbf{Transition probability:} \Sexpr{paste(threshold)}
 \\
