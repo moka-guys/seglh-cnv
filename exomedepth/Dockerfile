@@ -28,10 +28,10 @@ RUN apt-get --yes install \
 
 # LateX packages (Locked on 2020 release)
 RUN tlmgr init-usertree
-RUN tlmgr repository add ftp://tug.org/historic/systems/texlive/2020/tlnet-final
-RUN tlmgr repository remove http://mirror.ctan.org/systems/texlive/tlnet
-RUN tlmgr option repository ftp://tug.org/historic/systems/texlive/2020/tlnet-final
-RUN tlmgr update --self
+# RUN tlmgr repository add ftp://tug.org/historic/systems/texlive/2020/tlnet-final
+# RUN tlmgr repository remove https://mirror.ctan.org/systems/texlive/tlnet
+# RUN tlmgr option repository ftp://tug.org/historic/systems/texlive/2020/tlnet-final
+# RUN tlmgr update --self
 RUN tlmgr install framed && \
 	tlmgr install mdframed && \
 	tlmgr install zref && \
