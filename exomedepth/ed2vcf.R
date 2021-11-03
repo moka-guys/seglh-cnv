@@ -73,7 +73,7 @@ ed2vcf<-function(x, filename, fasta, roi, samplename) {
         )
       )
       #ALT
-      alt<-ifelse(cnv$type=="duplication","<DUP>",ifelse("deletion","<DEL>","<CNV>"))
+      alt<-ifelse(cnv$type=="duplication","<DUP>",ifelse(cnv$type=="deletion","<DEL>","<CNV>"))
       #INFO
       info<-data.frame(
         paste0('END=', cnv$end),
@@ -81,7 +81,7 @@ ed2vcf<-function(x, filename, fasta, roi, samplename) {
         paste0("CIPOS=",paste(roi[cnv$start.p-1,"end"]-cnv$start,"0",sep=',')),
         paste0("CIEND=",paste("0",roi[cnv$end.p+1,"start"]-cnv$end,sep=',')),
         paste0('GENES=',sapply(cnv$exons.hg19, function(x) paste(unique(sapply(strsplit(strsplit(ifelse(is.na(x),'.',x),',')[[1]],'_'),function(y) y[1])),collapse=','))),
-        paste0("SVTYPE=", ifelse(cnv$type=="duplication","DUP",ifelse("deletion","DEL","CNV")))
+        paste0("SVTYPE=", ifelse(cnv$type=="duplication","DUP",ifelse(cnv$type=="deletion","DEL","CNV")))
       )
       #FORMAT
       format = data.frame(
