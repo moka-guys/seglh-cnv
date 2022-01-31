@@ -80,7 +80,9 @@ limits<-list(
   maxcor=c(0.95, 0.90),  # max correlation within batch
   refcor=c(0.95, 0.90),  # reference set correlation
   refcount=c(3,1),       # reference set size (selected reference samples)
-  coeffvar=c(120, 150),  # coefficient of variation
+#  coeffvar=c(130, 150),  # VCP1 coefficient of variation
+  coeffvar=c(60, 70),    # VCP2 coefficient of variation
+#  coeffvar=c(120, 150),  # VCP3 coefficient of variation
   coverage=c(100),       # exon coverage limit
   expectedbf=c(5.0, NA), # expected BF
   minrefs=c(2,Inf)       # minimum reference set size
