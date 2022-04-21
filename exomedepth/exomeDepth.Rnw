@@ -167,7 +167,11 @@ sampleTable<-function(ref) {
   fnotes<-""
   ftitle<-""
   if (any(!is.na(sexMismatch))) {
-    if (any(sexMismatch)) {
+    smm<-any(sexMismatch)
+    if (is.na(smm)) {
+      ftitle<-"Warning:"
+      fnotes<-"Could not confirm sex match for full reference set. CNV calls on sex chromosomes could be unreliable!"
+    } else if (smm) {
       ftitle<-"Warning:"
       fnotes<-"Mismatched sex in reference set. CNV calls on sex chromosomes will be unreliable!"
     } else {
@@ -178,6 +182,7 @@ sampleTable<-function(ref) {
     kbl(rs, booktabs=TRUE) %>%
     row_spec(which(sexMismatch), bold = T, color = "white", background = "red") %>%
     row_spec(which(!sexMismatch), background = "green") %>%
+    row_spec(which(is.na(sexMismatch)), background = "orange") %>%
     footnote(general=fnotes, general_title=ftitle)
   )
   cat("\\end{scriptsize}")
@@ -292,7 +297,7 @@ plotRefsampleStats<-function() {
 cat(paste0('\\section{',gsub("_"," ",samplename),'}'))
 cat(paste0('\\textbf{Filename: }', gsub("_"," ",testsample)))
 # qc check (indicates that a QC measure has failed)
-if (any(qc$status!="PASS") || nrow(coverage.table)>0 || (!is.na(sexMismatch) && sexMismatch)) {
+if (any(qc$status!="PASS") || nrow(coverage.table)>0 || (!is.na(sexMismatch) && sexMismatch) || any(is.na(sexMismatch))) {
   cat("\\\\")
   qcWarning()
 }
