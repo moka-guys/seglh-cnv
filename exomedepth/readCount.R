@@ -175,6 +175,13 @@ if (length(testsamplenames)==0) {
         if (hasPon && hasXY && hasSex) {
             message(paste('Enforcing sex match of', testsample, 'to reference'))
             refsamples<-refsamples[which(rcsx==tssx)]
+        } else if (!hasPoN && hasXY && !is.na(tssx)) ) {
+            # if no PoN, XY targets and testsample has sex, do sex match if at least 2 matched references exist within batch
+            refsamples_candidates<-refsamples[which(rcsx==tssx)]
+            if (length(refsamples_candidates)>2) {
+                message(paste('Enforcing sex match of', testsample, 'within batch'))
+                refsamples<-refsamples_candidates
+            }
         }
         # pick reference  
         suppressWarnings(selected<-select.reference.set(
