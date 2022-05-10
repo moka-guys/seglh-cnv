@@ -189,10 +189,10 @@ if (length(testsamplenames)==0) {
             reference.counts=as.matrix(counts[,refsamples]),
             bin.length=(counts$end - counts$start)
         ))
-        # if not enough reference samples and PoN mode, enlarge reference set
+        # if not enough reference samples, enlarge reference set
         # -> accept lower power in favour of specificity
         ref.count<-which(selected$summary.stats$selected)
-        if (hasPon && ref.count < min.refs) {
+        if (ref.count < min.refs) {
             # create new df
             new.summary.stats <- selected$summary.stats
             new.summary.stats$selected <- FALSE
