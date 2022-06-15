@@ -106,6 +106,7 @@ if (length(refsamplenames)>=3) {
     refcor=c(0.95, 0.90),  # reference set correlation
     refcount=c(3,1),       # refernce set size (selected reference samples)
     coeffvar=c(30, 35),    # coefficient of variation
+    cvzscore=c(1,NA),      # Z-Score of the coefficient of variation 
     coverage=c(100),       # Minimum exon depth (read count)
     expectedbf=c(5.0, NA), # expected BF
     minrefs=c(2,Inf)       # minimum reference set size
@@ -159,23 +160,54 @@ if (length(refsamplenames)>=3) {
   ref.correlation<-cor(cbind(rpkm[,testsample],calcRPKM(reference.selected,(counts$end-counts$start+1))))[1,2]
   # decide on failures
   decide<-function(v,t) {
-    cmp<-ifelse(any(is.na(t)) || t[1]>t[2], function(m,n) m>=n, function(m,n) m<n)
-    threshold<-ifelse(any(is.na(t)) || t[1]>t[2],"equal or greater than","less than" )
-    status<-ifelse(!is.na(t[2]) && !cmp(v,t[2]),"FAIL",
-                ifelse(!is.na(t[1]) && !cmp(v,t[1]),"CAUTION","PASS"))
-    list(
-          value=round(v,3),
-          threshold=threshold,
-          warning=t[1],
-          fail=t[2],
-          status=status
+    result<-list(
+      value=round(v,3),
+      threshold='no threshold set',
+      warning=NA,
+      fail=NA,
+      status="PASS"
     )
+    if (!is.null(t)) {
+      cmp<-ifelse(any(is.na(t)) || t[1]>t[2], function(m,n) m>=n, function(m,n) m<n)
+      threshold<-ifelse(any(is.na(t)) || t[1]>t[2],"equal or greater than","less than" )
+      status<-ifelse(!is.na(t[2]) && !cmp(v,t[2]),"FAIL",
+                  ifelse(!is.na(t[1]) && !cmp(v,t[1]),"CAUTION","PASS"))
+      result<-list(
+        value=round(v,3),
+        threshold=threshold,
+        warning=t[1],
+        fail=t[2],
+        status=status
+      )
+    }
+    result
   }
+
+  # calc CV Z-score for each batch
+  batches<-as.factor(unlist(lapply(strsplit(rownames(stats),'_'),'[[',1)))
+  batches.mean<-by(stats$coeff.var, batches, mean)
+  batches.sd<-by(stats$coeff.var, batches, sd)
+  
+  # get/calc testsample data
+  testsample.cv<-stats[which(rownames(stats)==testsample),'coeff.var']
+  testsample.batch<-batches[which(rownames(stats)==testsample)]
+  batch.mean<-batches.mean[[testsample.batch]]
+  batch.sd<-batches.sd[[testsample.batch]]
+  testsample.cvz<-(testsample.cv - batch.mean)/batch.sd
+
+  # get Z-score bands
+  cvz.bands<-list(
+    c(batch.mean-(4*batch.sd),batch.mean+(4*batch.sd)), 
+    c(batch.mean-(3*batch.sd),batch.mean+(3*batch.sd)), 
+    c(batch.mean-(2*batch.sd),batch.mean+(2*batch.sd)), 
+    c(batch.mean-(1*batch.sd),batch.mean+(1*batch.sd))
+  )
 
   qc<-rbind(
     decide(stats[testsample,"batch.mediancor"],limits$medcor),
     decide(stats[testsample,"batch.maxcor"],limits$maxcor),
     decide(stats[testsample,"coeff.var"],limits$coeffvar),
+    decide(testsample.cvz,limits$cvzscore),
     decide(ref.correlation, limits$refcor),
     decide(stats[testsample,"refsamples"],limits$refcount),
     decide(stats[testsample,"min.refs"], limits$minrefs),
@@ -184,7 +216,8 @@ if (length(refsamplenames)>=3) {
   rownames(qc)=c(
             "Median correlation in batch",
             "Maximum correlation in batch",
-            "Coefficient of variation",
+            "Coefficient of variation (CV)",
+            "CV Z-score within batch",
             "Correlation with reference",
             "Size of reference set",
             "Forced minimum reference set size",
