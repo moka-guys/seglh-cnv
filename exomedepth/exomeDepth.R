@@ -129,7 +129,7 @@ if (length(refsamplenames)>=3) {
   coverage.table<-coverage.df[which(coverage.df$coverage.median<limits$coverage & coverage.df$exon%in%exonnames),]
 
   #
-  # check if reference sampole choice has mismatched sex
+  # check if reference sample choice has mismatched sex
   #
   sexMismatch<-rep(NA,length(refsets[[testsample]]$reference.choice))
   if (any(rois[,1]=="X") || any(rois[,1]=="Y")) {
@@ -253,7 +253,9 @@ if (length(refsamplenames)>=3) {
     result.annotated<-AnnotateExtra(x = result, reference.annotation = coveredexons,
       min.overlap = exon_overlap_frac, column.name = 'exons.hg19')
     # add extra annotation
-    if (!is.na(annotations)) {
+    if (all(is.na(annotations))) {
+      message('No CNV annotaions available')
+    } else {
       message('Adding extra annotations...')
       result.annotated<-AnnotateExtra(x = result.annotated, reference.annotation = annotations,
                                       min.overlap = extra_overlap_frac, column.name = 'annotation')
