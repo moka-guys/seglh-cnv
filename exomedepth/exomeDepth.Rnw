@@ -295,7 +295,6 @@ plotRefsampleStats<-function() {
   plot(batch.cv, xaxt="n", xlab=NA, ylab=NA, ylim=c(ymin-margin,ymax+margin), type="n")
   # get areas
   if (!all(is.null(limits$cvzscore))) {
-    # rect(par("usr")[1], par("usr")[3], par("usr")[2], par("usr")[4], col = rgb(0.8,1,0.8))
     if (!is.na(limits$cvzscore[1])) {
       rect(par("usr")[1], batch.mean+(limits$cvzscore[1]*batch.sd), par("usr")[2], par("usr")[4], density=10, col='chartreuse3')
     }
