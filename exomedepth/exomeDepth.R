@@ -196,7 +196,6 @@ if (length(refsamplenames)>=3) {
   testsample.cvz<-(testsample.cv - batch.mean)/batch.sd
 
   # get Z-score bands
-  
   cvz.bands<-list(
     c(batch.mean-(4*batch.sd),batch.mean+(4*batch.sd)), 
     c(batch.mean-(3*batch.sd),batch.mean+(3*batch.sd)), 

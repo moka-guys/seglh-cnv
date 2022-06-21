@@ -75,7 +75,7 @@ summarizeGene<-function(exonstring) {
   genes<-unique(sapply(strsplit(exons ,'_'),"[[",1))
   genex<-vector()
   for (gene in genes) {
-    exonnumbers<-sort(as.numeric(sapply(strsplit(exons[startsWith(exons,gene)],'_'),"[[",2)))
+    exonnumbers<-sort(as.numeric(sapply(strsplit(exons[startsWith(exons,paste(gene,"_",sep=""))],'_'),"[[",2)))
     if (length(exonnumbers)>1 && diff(range(exonnumbers))==(length(exonnumbers)-1)) {
       exonnumbers<-paste(range(exonnumbers),collapse='-')
     }
