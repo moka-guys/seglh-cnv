@@ -60,4 +60,7 @@ ADD exomeDepth.R /root
 ADD exomeDepth.Rnw /root
 ADD VERSION /root
 
+# add QC configs
+COPY qc_config/* /root
+
 ENTRYPOINT ["/usr/bin/Rscript"]
