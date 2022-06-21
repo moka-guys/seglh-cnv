@@ -278,28 +278,38 @@ plotCNVs<-function(res, cnvs, extend=1000, fullgene=TRUE) {
 plotRefsampleStats<-function() {
   # plotting colours
   highlight.col<-ifelse(colnames(batch.cor)==testsample,'hotpink','gray')
-  highlight.pch<-ifelse(colnames(batch.cor)==testsample,16,1)
+  highlight.pch<-ifelse(colnames(batch.cor)==testsample,19,1)
   bordercolour<-ifelse(colnames(batch.cor)==testsample,'black','snow4')
   cat("\\begin{multicols}{2}\n")
+  # Correlation plot
   boxplot(batch.cor, xaxt="n", col=highlight.col, border=bordercolour)
   abline(h=limits$medcor[2],col=c("red"),lty=2)
   title(main="Correlation within batch")
-  
-  save.image('/data/testme.RData')
-
-  # Coeff of variation
+  mtext("Note: Low correlation within batch could be due to high number of CNAs. Check set limits.",1)
+  # Coeff of variation plot
   keep.finite<-function(X) X[is.finite(X)]
   ymin<-min(c(keep.finite(limits$coeffvar),unlist(cvz.bands),batch.cv))
   ymax<-max(c(keep.finite(limits$coeffvar),unlist(cvz.bands),batch.cv))
   margin<-(ymax-ymin)*0.1
-  # generate plot
+  # generate plot surface
   plot(batch.cv, xaxt="n", xlab=NA, ylab=NA, ylim=c(ymin-margin,ymax+margin), type="n")
+  # get areas
+  if (!all(is.null(limits$cvzscore))) {
+    # rect(par("usr")[1], par("usr")[3], par("usr")[2], par("usr")[4], col = rgb(0.8,1,0.8))
+    if (!is.na(limits$cvzscore[1])) {
+      rect(par("usr")[1], batch.mean+(limits$cvzscore[1]*batch.sd), par("usr")[2], par("usr")[4], density=10, col='chartreuse3')
+    }
+    if (!is.na(limits$cvzscore[2])) {
+      rect(par("usr")[1], batch.mean+(limits$cvzscore[2]*batch.sd), par("usr")[2], par("usr")[4], density=10, col='red')
+    }
+  }
+  # mark thresholds
   for (l in limits$coeffvar) {
     if (!is.na(l)) abline(h=l, col=ifelse(l==max(limits$coeffvar),"red","chartreuse3"), lty=2)
   }
-  for (band in cvz.bands) rect(0,band[1],length(batch.cv)+1,band[2],lty=0,col=rgb(0,0,1,alpha=0.05))
+  # for (band in cvz.bands) rect(0,band[1],length(batch.cv)+1,band[2],lty=0,col=rgb(0,0,1,alpha=0.05))
   points(batch.cv, col=highlight.col, pch=highlight.pch)
-  # plot(batch.cv, xaxt="n",ylim=c(ymin-margin,ymax+margin), col=highlight.col, pch=highlight.pch)
+  mtext("Note: Dashed lines are fixed limits. Shaded bands are derived from variation within batch (SD)",1)
   title(main="Coefficient of variation")
   # END MULTICOLUMN
   cat("\\end{multicols}\n")
