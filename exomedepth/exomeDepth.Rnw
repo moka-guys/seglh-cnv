@@ -75,7 +75,7 @@ summarizeGene<-function(exonstring) {
   genes<-unique(sapply(strsplit(exons ,'_'),"[[",1))
   genex<-vector()
   for (gene in genes) {
-    exonnumbers<-sort(as.numeric(sapply(strsplit(exons[startsWith(exons,gene)],'_'),"[[",2)))
+    exonnumbers<-sort(as.numeric(sapply(strsplit(exons[startsWith(exons,paste(gene,"_",sep=""))],'_'),"[[",2)))
     if (length(exonnumbers)>1 && diff(range(exonnumbers))==(length(exonnumbers)-1)) {
       exonnumbers<-paste(range(exonnumbers),collapse='-')
     }
@@ -120,22 +120,26 @@ qcTable<-function() {
     }
     if (3%in%failed) {
       footnotes<-append(footnotes,
-        "High coefficient of variation within sample (scatter).")
+        "High coefficient of variation within sample (scatter). Check for batch effect.")
     }
     if (4%in%failed) {
       footnotes<-append(footnotes,
-        "Expect a higher false positive rate and reduced sensitivity due to low correlation with reference set.")
+        "High coefficient of variation in relation to batch.")
     }
     if (5%in%failed) {
       footnotes<-append(footnotes,
-        "The low number of reference samples could limit assay sensitivity if they contain the same alterations!")
+        "Expect a higher false positive rate and reduced sensitivity due to low correlation with reference set.")
     }
     if (6%in%failed) {
+      footnotes<-append(footnotes,
+        "The low number of reference samples could limit assay sensitivity if they contain the same alterations!")
+    }
+    if (7%in%failed) {
       footnotes<-append(footnotes,c(
         "The size of the reference set was adjusted to be greater than 1 to preserve specificity,",
         "  check selected reference samples for expected BF and correlation."))
     }
-    if (7%in%failed) {
+    if (8%in%failed) {
       footnotes<-append(footnotes,
         "The expected BF for the chosen reference is low, indicating limited power of the statistical model.")
     }
@@ -177,12 +181,15 @@ sampleTable<-function(ref) {
     } else {
       fnotes<-"Reference set is sex-matched."
     }
+  } else {
+    ftitle<-"Note:"
+    fnotes<-"No Sex match performed"
   }
   print(
     kbl(rs, booktabs=TRUE) %>%
     row_spec(which(sexMismatch), bold = T, color = "white", background = "red") %>%
     row_spec(which(!sexMismatch), background = "green") %>%
-    row_spec(which(is.na(sexMismatch)), background = "orange") %>%
+    row_spec(which(is.na(sexMismatch)), background = "white") %>%
     footnote(general=fnotes, general_title=ftitle)
   )
   cat("\\end{scriptsize}")
@@ -270,21 +277,38 @@ plotCNVs<-function(res, cnvs, extend=1000, fullgene=TRUE) {
 }
 plotRefsampleStats<-function() {
   # plotting colours
-  highlight<-ifelse(colnames(batch.cor)==testsample,'hotpink','snow2')
+  highlight.col<-ifelse(colnames(batch.cor)==testsample,'hotpink','gray')
+  highlight.pch<-ifelse(colnames(batch.cor)==testsample,19,1)
   bordercolour<-ifelse(colnames(batch.cor)==testsample,'black','snow4')
   cat("\\begin{multicols}{2}\n")
-  boxplot(batch.cor, xaxt="n", col=highlight, border=bordercolour)
+  # Correlation plot
+  boxplot(batch.cor, xaxt="n", col=highlight.col, border=bordercolour)
   abline(h=limits$medcor[2],col=c("red"),lty=2)
   title(main="Correlation within batch")
-  # Coeff of variation
-  ymin<-min(c(limits$coeffvar,batch.cv))
-  ymax<-max(c(limits$coeffvar,batch.cv))
+  mtext("Note: Low correlation within batch could be due to high number of CNAs. Check set limits.",1)
+  # Coeff of variation plot
+  keep.finite<-function(X) X[is.finite(X)]
+  ymin<-min(c(keep.finite(limits$coeffvar),unlist(cvz.bands),batch.cv))
+  ymax<-max(c(keep.finite(limits$coeffvar),unlist(cvz.bands),batch.cv))
   margin<-(ymax-ymin)*0.1
-  barplot(batch.cv, xaxt="n",ylim=c(ymin-margin,ymax+margin),xpd=FALSE,col=highlight,border=bordercolour)
-  box()
-  for (l in limits$coeffvar) {
-    abline(h=l, col=ifelse(l==max(limits$coeffvar),"red","chartreuse3"), lty=2)
+  # generate plot surface
+  plot(batch.cv, xaxt="n", xlab=NA, ylab=NA, ylim=c(ymin-margin,ymax+margin), type="n")
+  # get areas
+  if (!all(is.null(limits$cvzscore))) {
+    if (!is.na(limits$cvzscore[1])) {
+      rect(par("usr")[1], batch.mean+(limits$cvzscore[1]*batch.sd), par("usr")[2], par("usr")[4], density=10, col='chartreuse3')
+    }
+    if (!is.na(limits$cvzscore[2])) {
+      rect(par("usr")[1], batch.mean+(limits$cvzscore[2]*batch.sd), par("usr")[2], par("usr")[4], density=10, col='red')
+    }
   }
+  # mark thresholds
+  for (l in limits$coeffvar) {
+    if (!is.na(l)) abline(h=l, col=ifelse(l==max(limits$coeffvar),"red","chartreuse3"), lty=2)
+  }
+  # for (band in cvz.bands) rect(0,band[1],length(batch.cv)+1,band[2],lty=0,col=rgb(0,0,1,alpha=0.05))
+  points(batch.cv, col=highlight.col, pch=highlight.pch)
+  mtext("Note: Dashed lines are fixed limits. Shaded bands are derived from variation within batch (SD)",1)
   title(main="Coefficient of variation")
   # END MULTICOLUMN
   cat("\\end{multicols}\n")
