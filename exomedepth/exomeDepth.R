@@ -114,7 +114,11 @@ if (length(refsamplenames)>=3) {
   predicted_qc<-NA
   annotations<-NA  # CNV annotations
   ## load from file
-  if (!is.na(args[6])) load(args[6])
+  if (!is.na(args[6])) {
+    extras<-ifelse(startsWith(args[6],'/'), args[6], paste(scriptDirectory, args[6], sep='/'))
+    load(extras)
+  }
+
 
   #
   # Define low coverage exons
