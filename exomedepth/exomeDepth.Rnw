@@ -288,8 +288,8 @@ plotRefsampleStats<-function() {
   mtext("Note: Low correlation within batch could be due to high number of CNAs. Check set limits.",1)
   # Coeff of variation plot
   keep.finite<-function(X) X[is.finite(X)]
-  ymin<-min(c(keep.finite(limits$coeffvar),unlist(cvz.bands),batch.cv))
-  ymax<-max(c(keep.finite(limits$coeffvar),unlist(cvz.bands),batch.cv))
+  ymin<-min(keep.finite(c(limits$coeffvar,unlist(cvz.bands),batch.cv)))
+  ymax<-max(keep.finite(c(limits$coeffvar,unlist(cvz.bands),batch.cv)))
   margin<-(ymax-ymin)*0.1
   # generate plot surface
   plot(batch.cv, xaxt="n", xlab=NA, ylab=NA, ylim=c(ymin-margin,ymax+margin), type="n")
