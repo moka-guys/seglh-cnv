@@ -81,7 +81,6 @@ bam<-bam[bams.to.count]
 #
 # generate read counts from BAM files for all exons
 #
-print(bam)
 counts.computed<-NA
 if (length(bam)>0) {
     suppressWarnings(counts.computed <- getBamCounts(
