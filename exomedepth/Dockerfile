@@ -1,8 +1,8 @@
 # Base Image
-FROM r-base:4.0.3
+FROM rstudio/r-base:4.0.4-focal
 
 # Metadata
-LABEL base.image="r-base:4.0.3"
+LABEL base.image="r-base:4.0.4"
 LABEL software="ExomeDepth"
 LABEL description="CNV calling for DNA capture assays"
 LABEL website="https://CRAN.R-project.org/package=ExomeDepth"
@@ -42,6 +42,7 @@ RUN tlmgr install framed && \
 	tlmgr install xcolor
 
 # R dependencies
+RUN echo 'options("repos"="http://cran.ma.imperial.ac.uk", encoding="UTF-8")' > /root/.Rprofile
 RUN Rscript -e "install.packages('BiocManager');BiocManager::install(version = '3.12')" && \
 	Rscript -e "BiocManager::install(c('Biostrings','IRanges','Rsamtools','GenomicRanges','GenomicAlignments'))" && \
 	Rscript -e "install.packages('optparse')" && \
