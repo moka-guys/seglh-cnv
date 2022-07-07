@@ -1,5 +1,5 @@
 # Base Image
-FROM r-base:4.2.0
+FROM r-base:4.0.3
 
 # Metadata
 LABEL base.image="r-base:4.0.3"
@@ -42,7 +42,7 @@ RUN tlmgr install framed && \
 	tlmgr install xcolor
 
 # R dependencies
-RUN Rscript -e "install.packages('BiocManager');BiocManager::install(version = '3.15')" && \
+RUN Rscript -e "install.packages('BiocManager');BiocManager::install(version = '3.12')" && \
 	Rscript -e "BiocManager::install(c('Biostrings','IRanges','Rsamtools','GenomicRanges','GenomicAlignments'))" && \
 	Rscript -e "install.packages('optparse')" && \
 	Rscript -e "install.packages('randomForest')" && \
@@ -61,6 +61,6 @@ ADD exomeDepth.Rnw /root
 ADD VERSION /root
 
 # add QC configs
-COPY qc_config/* /root
+COPY qc_config/* /root/
 
 ENTRYPOINT ["/usr/bin/Rscript"]
