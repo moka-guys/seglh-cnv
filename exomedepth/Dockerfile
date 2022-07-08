@@ -1,8 +1,8 @@
 # Base Image
-FROM rstudio/r-base:4.0.4-focal
+FROM rstudio/r-base:4.2.1-focal
 
 # Metadata
-LABEL base.image="r-base:4.0.4"
+LABEL base.image="r-base:4.2.1"
 LABEL software="ExomeDepth"
 LABEL description="CNV calling for DNA capture assays"
 LABEL website="https://CRAN.R-project.org/package=ExomeDepth"
@@ -41,18 +41,23 @@ RUN tlmgr install framed && \
 	tlmgr install makecell && \
 	tlmgr install xcolor
 
-# R dependencies
-RUN echo 'options("repos"="http://cran.ma.imperial.ac.uk", encoding="UTF-8")' > /root/.Rprofile
-RUN Rscript -e "install.packages('BiocManager');BiocManager::install(version = '3.12')" && \
-	Rscript -e "BiocManager::install(c('Biostrings','IRanges','Rsamtools','GenomicRanges','GenomicAlignments'))" && \
-	Rscript -e "install.packages('optparse')" && \
+# set CRAN mirror
+RUN echo 'options(repos=structure(c(CRAN="http://cran.ma.imperial.ac.uk/")))' > /root/.Rprofile
+
+# R packages (BioC)
+RUN Rscript -e "install.packages('BiocManager');BiocManager::install(version = '3.15')" && \
+	Rscript -e "BiocManager::install(c('Biostrings','IRanges','Rsamtools','GenomicRanges','GenomicAlignments'))"
+
+# R packages (CRAN)
+RUN Rscript -e "install.packages('optparse')" && \
 	Rscript -e "install.packages('randomForest')" && \
+	Rscript -e "install.packages('aod')" && \
 	Rscript -e "install.packages('ExomeDepth')" && \
 	Rscript -e "install.packages('plyr')" && \
 	Rscript -e "install.packages('knitr')" && \
 	Rscript -e "install.packages('kableExtra')" && \
-	Rscript -e "install.packages('tinytex')" && \
-	Rscript -e "install.packages('Hmisc')"
+	Rscript -e "install.packages('tinytex')"
+#RUN Rscript -e "install.packages('Hmisc')"
 
 # add exomedepth scripts and report template
 ADD readCount.R /root
@@ -64,4 +69,5 @@ ADD VERSION /root
 # add QC configs
 COPY qc_config/* /root/
 
+# Rscript as entrypoint
 ENTRYPOINT ["/usr/bin/Rscript"]

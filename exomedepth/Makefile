@@ -11,11 +11,11 @@ IMG_LATEST    := $(IMG):latest
 
 .PHONY: push build version cleanbuild
 
-push: version build
+push: build
 	docker push $(IMG_VERSIONED)
 	docker push $(IMG_LATEST)
 
-build:
+build: version
 	#docker buildx build --platform linux/amd64 -t $(IMG_VERSIONED) .
 	docker build -t $(IMG_VERSIONED) .
 	docker tag $(IMG_VERSIONED) $(IMG_LATEST)
