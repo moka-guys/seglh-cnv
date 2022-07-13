@@ -39,6 +39,9 @@ RUN tlmgr install framed && \
 	tlmgr install dingbat && \
 	tlmgr install booktabs && \
 	tlmgr install makecell && \
+	tlmgr install colortbl && \
+	tlmgr install parskip && \
+	tlmgr install fancyhdr && \
 	tlmgr install xcolor
 
 # set CRAN mirror
