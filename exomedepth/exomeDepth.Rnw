@@ -59,7 +59,8 @@ cat(paste(c("\\lhead{ExomeDepth ",gsub("_"," ",pipeversion),"}"),collate="",sep=
 (\Sexpr{gsub("_"," ",length(coveredexons@ranges))} exons) \\
 \textbf{Reference genome:} \Sexpr{paste(basename(referenceFasta))} \\
 \textbf{Normalisation method:} \Sexpr{paste(normalisation.method)} \\
-\textbf{Transition probability:} \Sexpr{paste(threshold)}
+\textbf{Transition probability:} \Sexpr{paste(threshold)} \\
+\textbf{QC configuration:} \Sexpr{sanitize(basename(extras)}!
 \\
 
 <<functions, echo=FALSE, message=FALSE>>=
@@ -321,7 +322,10 @@ plotRefsampleStats<-function() {
 cat(paste0('\\section{',gsub("_"," ",samplename),'}'))
 cat(paste0('\\textbf{Filename: }', gsub("_"," ",testsample)))
 # qc check (indicates that a QC measure has failed)
-if (any(qc$status!="PASS") || nrow(coverage.table)>0 || (!is.na(sexMismatch) && sexMismatch) || any(is.na(sexMismatch))) {
+failedQC<-any(qc$status!="PASS")
+failedCoverage<-nrow(coverage.table)>0
+failedSexmatch<-!any(is.na(sexMismatch)) && any(sexMismatch)
+if (failedQC || failedCoverage || failedSexmatch) {
   cat("\\\\")
   qcWarning()
 }

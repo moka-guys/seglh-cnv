@@ -59,7 +59,8 @@ RUN Rscript -e "install.packages('optparse')" && \
 	Rscript -e "install.packages('plyr')" && \
 	Rscript -e "install.packages('knitr')" && \
 	Rscript -e "install.packages('kableExtra')" && \
-	Rscript -e "install.packages('tinytex')"
+	Rscript -e "install.packages('tinytex')" && \
+	Rscript -e "install.packages('xtable')"
 #RUN Rscript -e "install.packages('Hmisc')"
 
 # add exomedepth scripts and report template
