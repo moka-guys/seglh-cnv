@@ -103,7 +103,7 @@ for (c in pcn) {
     counts.imported<-counts
     detach()
     # if compatible normals, amend counts table
-    if (!is.na(counts.computed)) {
+    if (length(bam)>0) {
         targets.same<-all.equal(counts.computed[,c(1:cmp.cols)], targets.imported)
         if (targets.same && ncol(counts.imported)>0) {
             counts.computed<-cbind(counts.computed,counts.imported)
