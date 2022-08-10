@@ -22,6 +22,7 @@ if (!("knitr" %in% installed.packages())) {
 cat(paste('Loading Packages\n'))
 require(warn.conflicts=FALSE,quietly=FALSE,package="GenomicRanges")
 require(warn.conflicts=FALSE,quietly=FALSE,package="ExomeDepth")
+require(warn.conflicts=FALSE,quietly=FALSE,package="xtable")
 require(warn.conflicts=FALSE,quietly=FALSE,package="knitr")
 require(warn.conflicts=FALSE,quietly=FALSE,package="kableExtra")
 require(warn.conflicts=FALSE,quietly=FALSE,package="randomForest")
@@ -60,7 +61,7 @@ message(paste('Running',pipeversion))
 # loads counts,samplenames,rois (extended exons.hg19)
 load(args[4])
 normalisation.method<-ifelse(testsample%in%refsamplenames,'BATCH','PoN')
-
+extras<-args[6]
 message(paste('        Version:',args[1]))
 message(paste('         Output:',args[2]))
 message(paste('            ROI:',panel[1]))
@@ -70,7 +71,7 @@ message(paste('   Original BAM:',testsample))
 message(paste('     SampleName:',samplename))
 message(paste('  Normalisation:',normalisation.method))
 message(paste('    Ref samples:',length(refsamplenames[which(testsample!=refsamplenames)])))
-message(paste('         Extras:',args[6]))
+message(paste('         Extras:',extras))
 
 #
 # Check if testsample in refsamples
@@ -105,8 +106,8 @@ if (length(refsamplenames)>=3) {
     maxcor=c(0.95, 0.90),  # max correlation within batch
     refcor=c(0.95, 0.90),  # reference set correlation
     refcount=c(3,1),       # refernce set size (selected reference samples)
-    coeffvar=c(30, 35),    # coefficient of variation
-    cvzscore=c(1,NA),      # Z-Score of the coefficient of variation 
+    coeffvar=c(NA, NA),    # coefficient of variation
+    cvzscore=c(1,4),       # Z-Score of the coefficient of variation 
     coverage=c(100),       # Minimum exon depth (read count)
     expectedbf=c(5.0, NA), # expected BF
     minrefs=c(2,Inf)       # minimum reference set size
@@ -114,8 +115,8 @@ if (length(refsamplenames)>=3) {
   predicted_qc<-NA
   annotations<-NA  # CNV annotations
   ## load from file
-  if (!is.na(args[6])) {
-    extras<-ifelse(startsWith(args[6],'/'), args[6], paste(scriptDirectory, args[6], sep='/'))
+  if (!is.na(extras)) {
+    extras<-ifelse(startsWith(extras,'/'), extras, paste(scriptDirectory, extras, sep='/'))
     load(extras)
   }
 
@@ -157,7 +158,7 @@ if (length(refsamplenames)>=3) {
   #
   # Build QC table and predict Quality outcome of classifier provided
   #
-  if (!is.na(args[6]) && !is.null(rfc)) {
+  if (!is.na(extras) && !is.null(rfc)) {
     predicted_qc<-predict(rfc,stats[testsample,2:ncol(stats)])
   }
   # build QC table

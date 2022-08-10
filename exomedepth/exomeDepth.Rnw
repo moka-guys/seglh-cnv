@@ -44,7 +44,7 @@
 \renewcommand{\sectionmark}[1]{\markright{#1}}
 \fancyhf{}
 <<headnote, echo=FALSE, message=FALSE, results='asis' >>=
-cat(paste(c("\\lhead{ExomeDepth ",gsub("_"," ",pipeversion),"}"),collate="",sep=""))
+cat(paste(c("\\lhead{ExomeDepth ",sanitize(pipeversion),"}"),collate="",sep=""))
 @
 \rhead{\rightmark}
 \lfoot{\today}
@@ -53,13 +53,14 @@ cat(paste(c("\\lhead{ExomeDepth ",gsub("_"," ",pipeversion),"}"),collate="",sep=
 % DOCUMENT
 \begin{document}
 \maketitle
-\textbf{Panel:} \Sexpr{gsub("_"," ",panel[2])}
-(\Sexpr{gsub("_"," ",panel[1])}) \\
+\textbf{Panel:} \Sexpr{sanitize(panel[2])}
+(\Sexpr{sanitize(panel[1])}) \\
 \textbf{Genes:} \Sexpr{paste(selected.genes[order(selected.genes)],collapse=", ")}
-(\Sexpr{gsub("_"," ",length(coveredexons@ranges))} exons) \\
+(\Sexpr{sanitize(length(coveredexons@ranges))} exons) \\
 \textbf{Reference genome:} \Sexpr{paste(basename(referenceFasta))} \\
 \textbf{Normalisation method:} \Sexpr{paste(normalisation.method)} \\
-\textbf{Transition probability:} \Sexpr{paste(threshold)}
+\textbf{Transition probability:} \Sexpr{paste(threshold)} \\
+\textbf{QC configuration:} \Sexpr{sanitize(basename(extras))}
 \\
 
 <<functions, echo=FALSE, message=FALSE>>=
@@ -318,10 +319,13 @@ plotRefsampleStats<-function() {
 <<table, size='footnotesize', results='asis', echo=FALSE, message=FALSE, fig.width=9, fig.height=4, out.width='1.0\\linewidth' >>=
 # NB Assay info header printed above
 # Sample header
-cat(paste0('\\section{',gsub("_"," ",samplename),'}'))
-cat(paste0('\\textbf{Filename: }', gsub("_"," ",testsample)))
+cat(paste0('\\section{',sanitize(samplename),'}'))
+cat(paste0('\\textbf{Filename: }',sanitize(testsample)))
 # qc check (indicates that a QC measure has failed)
-if (any(qc$status!="PASS") || nrow(coverage.table)>0 || (!is.na(sexMismatch) && sexMismatch) || any(is.na(sexMismatch))) {
+failedQC<-any(qc$status!="PASS")
+failedCoverage<-nrow(coverage.table)>0
+failedSexmatch<-!any(is.na(sexMismatch)) && any(sexMismatch)
+if (failedQC || failedCoverage || failedSexmatch) {
   cat("\\\\")
   qcWarning()
 }
