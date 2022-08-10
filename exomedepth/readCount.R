@@ -150,7 +150,7 @@ if (length(testsamplenames)==0) {
 	if (length(bad.normals)>0) {
 		message("Removing normals that have insufficient ROI coverage")
 		print(bad.normals)
-		counts<-counts[,-which(colnames(counts) %in% bad.normals)],
+		counts<-counts[,-which(colnames(counts) %in% bad.normals)]
 	}
     # save normal counts
     save(list=c("refsamplenames",  # supplied normals
