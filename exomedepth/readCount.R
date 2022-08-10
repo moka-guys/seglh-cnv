@@ -22,6 +22,7 @@ normalprefix<-'NORMAL'
 cmp.cols<-3
 sex<-regex('_[MF]_')
 min.refs<-2
+mincov.pon<-100
 #
 # READ ARGS
 #
@@ -144,10 +145,18 @@ if (length(normals)>0) {
 #
 if (length(testsamplenames)==0) {
     message('Creating Panel of Normals (PoN)...')
+	# remove all samples from PoN that do not match coverage requirement
+	bad.normals<-names(which(apply(counts[,bams], 2, min)<mincov.pon))
+	if (length(bad.normals)>0) {
+		message("Removing normals that have insufficient ROI coverage")
+		print(bad.normals)
+		counts<-counts[,-which(colnames(counts) %in% bad.normals)],
+	}
     # save normal counts
     save(list=c("refsamplenames",  # supplied normals
                 "counts"),         # normal counts
          file = args[1])
+
 } else {
     message('Building reference sets...')
     # Calculate RPKM
