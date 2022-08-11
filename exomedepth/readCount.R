@@ -241,8 +241,6 @@ batch.cor<-cor(rpkm)
 diag(batch.cor)<-NA
 stats<-data.frame()
 
-save.image()
-
 for (rs in names(refsamplenames)) {
 	for (testsample in testsamplenames) {
 		message(paste('Collecting stats for',testsample,'with',toupper(rs),'reference set'))
@@ -278,6 +276,6 @@ save(list=c(
 			"refsets",         # picked reference sets
 			"rpkm",            # RPKM calculation
 			"calcRPKM",        # function to calculate RPKM
-			"stats"),          # model and betch statistics
+			"stats"),          # model and batch statistics
 	 file = args[1])
 message('DONE')
