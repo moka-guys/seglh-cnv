@@ -60,8 +60,20 @@ message(paste('Running',pipeversion))
 
 # loads counts,samplenames,rois (extended exons.hg19)
 load(args[4])
-normalisation.method<-ifelse(testsample%in%refsamplenames,'BATCH','PoN')
 extras<-args[6]
+
+# select normalisation method (backwards compatibility)
+normalisation.method<-ifelse('pon'%in%names(refsamplenames),'pon','batch')
+if (normalisation.method%in%names(refsamplenames)) {
+	refsamplenames<-refsamplenames[[normalisation.method]]
+	for (s in names(refsets)) refsets[[s]]<-refsets[[s]][[normalisation.method]]
+} else {
+	stop('No reference set available')
+}
+
+#
+# report run configuration
+#
 message(paste('        Version:',args[1]))
 message(paste('         Output:',args[2]))
 message(paste('            ROI:',panel[1]))
@@ -69,7 +81,7 @@ message(paste('     Panel Name:',panel[2]))
 message(paste('    Read Counts:',args[4]))
 message(paste('   Original BAM:',testsample))
 message(paste('     SampleName:',samplename))
-message(paste('  Normalisation:',normalisation.method))
+message(paste('  Normalisation:',toupper(normalisation.method)))
 message(paste('    Ref samples:',length(refsamplenames[which(testsample!=refsamplenames)])))
 message(paste('         Extras:',extras))
 
