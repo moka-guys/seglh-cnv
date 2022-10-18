@@ -51,7 +51,7 @@ ed2vcf<-function(x, filename, fasta, roi, samplename) {
 
     ## Build Variant data
     vcf<-data.frame()
-    if (!is.null(x) && !is.na(x)) {
+    if (class(x) == "ExomeDepth") {
       cnv<-x@CNV.calls
       #FILTER
       filter<-as.vector(by(cnv,seq_len(nrow(cnv)), function(c) {
