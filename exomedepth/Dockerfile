@@ -42,6 +42,7 @@ RUN tlmgr install framed && \
 	tlmgr install colortbl && \
 	tlmgr install parskip && \
 	tlmgr install fancyhdr && \
+	tlmgr install lastpage && \
 	tlmgr install xcolor
 
 # set CRAN mirror
