@@ -49,7 +49,7 @@ RUN tlmgr install framed && \
 RUN echo 'options(repos=structure(c(CRAN="http://cran.ma.imperial.ac.uk/")))' > /root/.Rprofile
 
 # R packages (BioC)
-RUN Rscript -e "install.packages('BiocManager');BiocManager::install(version = '3.15')" && \
+RUN Rscript -e "install.packages('BiocManager');BiocManager::install(version = '3.15', ask = FALSE)" && \
 	Rscript -e "BiocManager::install(c('Biostrings','IRanges','Rsamtools','GenomicRanges','GenomicAlignments'))"
 
 # R packages (CRAN)

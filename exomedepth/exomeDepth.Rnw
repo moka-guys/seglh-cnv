@@ -62,7 +62,7 @@ cat(paste(c("\\lhead{ExomeDepth ",sanitize(pipeversion),"}"),collate="",sep=""))
 \textbf{Panel:} \Sexpr{sanitize(panel[2])}
 (\Sexpr{sanitize(panel[1])}) \\
 \textbf{Genes:} \Sexpr{paste(selected.genes[order(selected.genes)],collapse=", ")}
-(\Sexpr{sanitize(length(coveredexons@ranges))} exons) \\
+(\Sexpr{sanitize(length(coveredexons@ranges))} segments) \\
 \textbf{Reference genome:} \Sexpr{paste(basename(referenceFasta))} \\
 \textbf{Normalisation methods:} \Sexpr{paste(rev(names(results)))} \\
 \textbf{Transition probability:} \Sexpr{paste(threshold)} \\

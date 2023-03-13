@@ -95,7 +95,7 @@ if (length(bam)>0) {
 
 #
 # add precomputed counts (normals only)
-# 
+#
 for (c in pcn) {
     # import precomputed normals
     attach(c)
@@ -105,7 +105,7 @@ for (c in pcn) {
     detach()
     # if compatible normals, amend counts table
     if (length(bam)>0) {
-        targets.same<-all.equal(counts.computed[,c(1:cmp.cols)], targets.imported)
+        targets.same<-isTRUE(all.equal(counts.computed[,c(1:cmp.cols)], targets.imported))
         if (targets.same && ncol(counts.imported)>0) {
             counts.computed<-cbind(counts.computed,counts.imported)
         } else {
