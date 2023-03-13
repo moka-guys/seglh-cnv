@@ -1,13 +1,3 @@
----
-title: "ExomeDepth CNV pipeline"
-author: "David Brawand <dbrawand@nhs.net>"
-date: "2021/02/15"
-output:
-  pdf_document:
-    toc: true
-    highlight: zenburn
----
-
 # SEGLH ExomeDepth pipeline
 
 ## input files
