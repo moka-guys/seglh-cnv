@@ -182,6 +182,8 @@ if (length(names(refsamplenames))>0) {
   # Build QC table
   #
   message('Building QC summary...')
+  # decides if a particular metric is within the reference range
+  # v being the measured value, t[1] being the warning limit, t[2] being the failure limit
   decide<-function(v,t) {
     result<-list(
       value=round(v,3),
@@ -191,6 +193,7 @@ if (length(names(refsamplenames))>0) {
       status="PASS"
     )
     if (!is.null(t)) {
+      # comparison function (infers if lower or upper limit)
       cmp<-ifelse(any(is.na(t)) || t[1]>t[2], function(m,n) m>=n, function(m,n) m<n)
       threshold<-ifelse(any(is.na(t)) || t[1]>t[2],"equal or greater than","less than" )
       status<-ifelse(!is.na(t[2]) && !cmp(v,t[2]),"FAIL",
