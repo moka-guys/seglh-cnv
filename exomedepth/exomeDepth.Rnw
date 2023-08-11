@@ -163,7 +163,7 @@ qcTable<-function() {
       row_spec(which(qc_tables[[rs]]$status=="FAIL"), bold = T, color = "white", background = "red") %>%
       row_spec(which(qc_tables[[rs]]$status=="PASS"), background = "green") %>%
       row_spec(which(qc_tables[[rs]]$status=="CAUTION"), color = "white", background = "orange") %>%
-      { if (!is.na(fnotes)) footnote(., general=paste(fnotes), general_title=ftitle) else . }
+      { if (any(!is.na(fnotes))) footnote(., general=paste(fnotes), general_title=ftitle) else . }
     )  
   }
 }
