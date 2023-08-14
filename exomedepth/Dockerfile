@@ -43,14 +43,16 @@ RUN tlmgr install framed && \
 	tlmgr install parskip && \
 	tlmgr install fancyhdr && \
 	tlmgr install lastpage && \
+	tlmgr install pgf && \
 	tlmgr install xcolor
 
 # set CRAN mirror
-RUN echo 'options(repos=structure(c(CRAN="http://cran.ma.imperial.ac.uk/")))' > /root/.Rprofile
+RUN echo 'options(repos=structure(c(CRAN="http://cran.ma.imperial.ac.uk/")))' > /root/.Rprofile && \
+    echo 'options(BioC_mirror="http://bioconductor.statistik.tu-dortmund.de/")' >> /root/.Rprofile
 
 # R packages (BioC)
-RUN Rscript -e "install.packages('BiocManager');BiocManager::install(version = '3.15', ask = FALSE)" && \
-	Rscript -e "BiocManager::install(c('Biostrings','IRanges','Rsamtools','GenomicRanges','GenomicAlignments'))"
+RUN Rscript -e "install.packages('BiocManager');BiocManager::install(version = '3.15', ask = FALSE)"
+RUN Rscript -e "BiocManager::install(c('Biostrings','IRanges','Rsamtools','GenomicRanges','GenomicAlignments'))"
 
 # R packages (CRAN)
 RUN Rscript -e "install.packages('optparse')" && \
