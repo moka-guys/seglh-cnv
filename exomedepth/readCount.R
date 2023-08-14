@@ -107,7 +107,11 @@ for (c in pcn) {
     if (length(bam)>0) {
         targets.same<-isTRUE(all.equal(counts.computed[,c(1:cmp.cols)], targets.imported))
         if (targets.same && ncol(counts.imported)>0) {
-            counts.computed<-cbind(counts.computed,counts.imported)
+            message(paste('INFO: Supplied count data is compatible and will be merged',c))
+            # strip non-sample columns before merge
+            counts.imported.clean<-counts.imported[,!colnames(counts.imported) %in% c("chromosome", "start", "end", "exon", "GC")]
+            # merge the colums
+            counts.computed<-cbind(counts.computed, counts.imported.clean)
         } else {
             message(paste('ERROR: Supplied count data not compatible',c))
         }
