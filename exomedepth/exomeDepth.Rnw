@@ -243,30 +243,35 @@ CNVtable<-function(cnvtable,footer) {
   )
   cat("\\end{scriptsize}\n")
 }
-multiPlotCNVs<-function(res,cnvs,extend=1000) {
+multiPlotCNVs<-function(res,cnvlocs,extend=1000) {
   # reorder and remove BF<0
   annot<-res[[1]]@annotations
   .pardefault<-par(no.readonly=TRUE)  # save plot environment
-  if (nrow(cnvs)>0) {
-    for (i in 1:nrow(cnvs)) {
-      message(paste(cnvs[i,],collapse=' '))
+  if (nrow(cnvlocs)==0) {
+    message('INFO: No CNVs to plot')
+    cat("\\textbf{NO CNVs TO PLOT}\n")
+  }  else {
+    message('INFO: Plotting CNVs')
+    cnvlocs<-unique(cnvlocs[,1:5])
+    for (i in 1:nrow(cnvlocs)) {
+      message(paste(cnvlocs[i,],collapse=' '))
       message('--------------\n')
       # get gene limits
-      chrom<-cnvs[i,'chromosome']
-      chromStart<-cnvs[i,'start']
-      chromEnd<-cnvs[i,'end']
-      cnvType<-cnvs[i,"type"]
+      chrom<-cnvlocs[i,'chromosome']
+      chromStart<-cnvlocs[i,'start']
+      chromEnd<-cnvlocs[i,'end']
+      cnvType<-cnvlocs[i,"type"]
       genes<-as.character(unique(annot[which(annot$chromosome==chrom & 
         annot$end>chromStart & annot$start<chromEnd),'name']))
       if (length(genes)>0) {
           start<-min(annot[which(annot$name%in%genes),'start']) - extend
           end<-max(annot[which(annot$name%in%genes),'end']) + extend
       } else {
-          start<-cnvs[i,'start'] - extend
-          end<-cnvs[i,'end'] + extend
+          start<-cnvlocs[i,'start'] - extend
+          end<-cnvlocs[i,'end'] + extend
       }
       # get gene and exon names
-      e<-unlist(strsplit(as.character(cnvs[i,'exons.hg19']),'[,]'))
+      e<-unlist(strsplit(as.character(cnvlocs[i,'exons.hg19']),'[,]'))
       g<-unique(sapply(strsplit(as.character( e ),'_'),"[[",1))
       gene_names <- paste(g, collapse=",")
 
@@ -571,7 +576,7 @@ for (rs in rev(names(results))) {
       CNVtable(cnvtable, add_footer)
     } else {
       cat('\n\n\n')
-      cat("\\textbf{NO CNVs CALLED IN REGION OF INTEREST WITH.}\n")
+      cat("\\textbf{NO CNVs CALLED IN REGION OF INTEREST}\n")
     }
   }
 }
@@ -580,7 +585,7 @@ for (rs in rev(names(results))) {
 cat('\\newpage\n')
 cat("\\subsubsection*{Coverage plots}\n")
 cat("\\begin{multicols*}{2}\n")
-multiPlotCNVs(results, unique(cnvloc[,1:5]))
+multiPlotCNVs(results, cnvloc)
 cat("\\end{multicols*}\n")
 # Print QC stuff
 cat('\\newpage\n')
