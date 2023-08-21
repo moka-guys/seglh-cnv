@@ -244,14 +244,16 @@ CNVtable<-function(cnvtable,footer) {
   cat("\\end{scriptsize}\n")
 }
 multiPlotCNVs<-function(res,cnvlocs,extend=1000) {
-  # reorder and remove BF<0
-  annot<-res[[1]]@annotations
   .pardefault<-par(no.readonly=TRUE)  # save plot environment
   if (nrow(cnvlocs)==0) {
     message('INFO: No CNVs to plot')
     cat("\\textbf{NO CNVs TO PLOT}\n")
-  }  else {
+  } else {
     message('INFO: Plotting CNVs')
+    # get annotations from first not NA result
+    annotidx<-names(res)[!is.na(res)][1]
+    annot<-res[[annotidx]]@annotations
+    # get cnv plotting locations
     cnvlocs<-unique(cnvlocs[,1:5])
     for (i in 1:nrow(cnvlocs)) {
       message(paste(cnvlocs[i,],collapse=' '))
@@ -536,16 +538,21 @@ for (rs in rev(names(results))) {
     match_col <- vector()
     for (crs in names(results)) {
       if (crs!=rs) {
-        match_col <- append(match_col, crs)
-        cnv_merged<-cnvs %>% left_join(results[[crs]]@CNV.calls,
-          by=c('start.p','end.p'))
-        cnv_match[[crs]]<-ifelse(!is.na(cnv_merged$chromosome.y),"\\checkmark","")
+        if (class(results[[crs]])!="ExomeDepth") {
+          cnv_match[[crs]]<-""
+        } else {
+          match_col <- append(match_col, crs)
+          cnv_merged<-cnvs %>% left_join(results[[crs]]@CNV.calls,
+            by=c('start.p','end.p'))
+          cnv_match[[crs]]<-ifelse(!is.na(cnv_merged$chromosome.y),"\\checkmark","")
+        } 
       }
     }
     cnvs <- cbind(cnvs, data.frame(cnv_match))
-    # filter CNVs (sort by BF and remove negative BF and unannotated)
+    # filter CNVs (sort by BF and remove negative BF)
     cnvs<-cnvs[order(cnvs$BF, decreasing = TRUE),]
     cnvs<-cnvs[which(cnvs$BF>0),]
+    # filter unannotated CNVs (out of ROI scope)
     cnvs<-cnvs[which(not.na(cnvs$exons.hg19)),]
     # render CNV data
     if (!!nrow(cnvs)) {
@@ -587,16 +594,13 @@ cat("\\subsubsection*{Coverage plots}\n")
 cat("\\begin{multicols*}{2}\n")
 multiPlotCNVs(results, cnvloc)
 cat("\\end{multicols*}\n")
+
 # Print QC stuff
 cat('\\newpage\n')
 cat("\\subsection*{Quality Control}\n")
 qcTable()
 plotRefsampleStats()
 refsampleTable(refsets[[testsample]])
-
-save.image()
-
-# plot lowCoverageExons
 cat("\\subsubsection*{Coverage limitations}\n")
 lowCoverageExons()
 @

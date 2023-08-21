@@ -38,30 +38,30 @@ source('ed2vcf.R')
 #
 # READ ARGS
 #
-cmd<-commandArgs(trailingOnly = FALSE)
-runningScript<-unlist(strsplit(cmd[which(substr(cmd,1,7)=='--file=')],'='))[2]
-scriptDirectory<-normalizePath(dirname(runningScript))
-args<-commandArgs(trailingOnly = TRUE)
-setwd(dirname(args[2]))  # set working directory to target directory (THIS IS ABSOLUTELY NECESSARY!)
+cmd <- commandArgs(trailingOnly = FALSE)
+runningScript <- unlist(strsplit(cmd[which(substr(cmd,1, 7) == "--file=")],"="))[2]
+scriptDirectory <- normalizePath(dirname(runningScript))
+args <- commandArgs(trailingOnly = TRUE)
+setwd(dirname(args[2]))  # set working dir to target dir (ABSOLUTELY NECESSARY)
 
 #
 # print what will be printed
 #
-panel<-unlist(strsplit(args[3],':'))  # covered regons name
-testsample<-basename(unlist(strsplit(args[5],':'))[1])  # RGID
-samplename<-as.character(unlist(strsplit(args[5],':'))[2]) # RGSM
-threshold<-as.numeric(unlist(strsplit(args[5],':'))[3]) # Threshold set in ngs_config
-if(is.na(threshold)) {
-    threshold<-10^-3
+panel <- unlist(strsplit(args[3],":"))  # covered regons name
+testsample <- basename(unlist(strsplit(args[5],":"))[1])  # RGID
+samplename <- as.character(unlist(strsplit(args[5],":"))[2]) # RGSM
+threshold <- as.numeric(unlist(strsplit(args[5],":"))[3]) # Thresh in ngs_config
+if (is.na(threshold)) {
+    threshold <- 10^-3
 }
 
 # version report header
-argversion<-args[1]
-versionfile<-paste(scriptDirectory,'VERSION', sep='/')
-pipeversion<-ifelse(file.exists(versionfile),
-                    paste(argversion,readChar(versionfile,7),sep="-"),
+argversion <- args[1]
+versionfile <- paste(scriptDirectory, "VERSION", sep = "/")
+pipeversion <- ifelse(file.exists(versionfile),
+                    paste(argversion, readChar(versionfile, 7), sep = "-"),
                     argversion)
-message(paste('Running',pipeversion))
+message(paste("Running", pipeversion))
 
 # loads counts,samplenames,rois (extended exons.hg19)
 load(args[4])
@@ -275,10 +275,11 @@ if (length(names(refsamplenames))>0) {
     print(paste('Raw CNV count:',length(cnvs@CNV.calls)))
 
     # annotate results
-    message("Annotating CNVs...")
+    message("*** Annotating CNVs...")
     exon_overlap_frac <- 0.000000001  # 1bp/1Gb, basically any overlap
     extra_overlap_frac <- 0.1  # 1bp/10bp (only valid for if annotation is large known SegDups)
-    if (length(cnvs@CNV.calls)>0) {
+    if (nrow(cnvs@CNV.calls) > 0) {
+      message(paste("CNVs to be annotated:", length(cnvs@CNV.calls)))
       # add exon numbers (from subset)
       cnvs.annotated <- AnnotateExtra(x = cnvs,
                                     reference.annotation = coveredexons,
