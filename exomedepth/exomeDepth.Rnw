@@ -251,7 +251,8 @@ multiPlotCNVs<-function(res,cnvlocs,extend=1000) {
   } else {
     message('INFO: Plotting CNVs')
     # get annotations from first not NA result
-    annotidx<-names(res)[!is.na(res)][1]
+    withResults<-names(res)[!is.na(res)]
+    annotidx<-withResults[1]
     annot<-res[[annotidx]]@annotations
     # get cnv plotting locations
     cnvlocs<-unique(cnvlocs[,1:5])
@@ -281,7 +282,7 @@ multiPlotCNVs<-function(res,cnvlocs,extend=1000) {
       # get annotation from first result object (their annotations are identical)
       #
       anno<-list()
-      for (rs in names(res)) {
+      for (rs in withResults) {
         anno[[rs]] <- res[[rs]]@annotations
         selected <- which(anno[[rs]]$chromosome == chrom &
             anno[[rs]]$start >= start & anno[[rs]]$end <= end & 
