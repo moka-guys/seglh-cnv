@@ -56,14 +56,15 @@ RUN Rscript -e "BiocManager::install(c('Biostrings','IRanges','Rsamtools','Genom
 
 # R packages (CRAN)
 RUN Rscript -e "install.packages('optparse')" && \
-    Rscript -e "install.packages('randomForest')" && \
-    Rscript -e "install.packages('aod')" && \
-    Rscript -e "install.packages('ExomeDepth')" && \
-    Rscript -e "install.packages('plyr')" && \
-    Rscript -e "install.packages('knitr')" && \
-    Rscript -e "install.packages('kableExtra')" && \
-    Rscript -e "install.packages('tinytex')" && \
-    Rscript -e "install.packages('xtable')"
+	Rscript -e "install.packages('randomForest')" && \
+	Rscript -e "install.packages('aod')" && \
+	Rscript -e "install.packages('ExomeDepth')" && \
+	Rscript -e "install.packages('plyr')" && \
+	Rscript -e "install.packages('knitr')" && \
+	Rscript -e "install.packages('kableExtra')" && \
+	Rscript -e "install.packages('tinytex')" && \
+	Rscript -e "install.packages('xtable')" && \
+	Rscript -e "install.packages('moments')"
 
 # install ED from source as CRAN rejected ED (10/2022) v1.1.16
 # CRAN reinstated ED (11/2020) v1.1.16
