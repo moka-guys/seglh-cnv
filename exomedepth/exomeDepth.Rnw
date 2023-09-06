@@ -1,7 +1,9 @@
 \documentclass[10pt,a4paper]{article}
-\usepackage[margin=1.1 in]{geometry}
+\usepackage[margin=0.8 in]{geometry}
 \usepackage[parfill]{parskip}
 \usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{tikz}
 \usepackage{multicol}
 \usepackage{makecell}
 \usepackage{mdframed}
@@ -14,6 +16,8 @@
   {\par\begin{mdframed}[linewidth=2pt,linecolor=red]}%
   {\end{mdframed}\par}%
 % endWarning
+
+\def\checkmark{\tikz\fill[scale=0.4](0,.35) -- (.25,0) -- (1,.7) -- (.25,.15) -- cycle;} 
 
 % font
 \renewcommand{\familydefault}{\sfdefault}  % sans font
@@ -43,12 +47,14 @@
 \pagestyle{fancy}
 \renewcommand{\sectionmark}[1]{\markright{#1}}
 \fancyhf{}
+
 <<headnote, echo=FALSE, message=FALSE, results='asis' >>=
 cat(paste(c("\\lhead{ExomeDepth ",sanitize(pipeversion),"}"),collate="",sep=""))
 @
+
 \rhead{\rightmark}
 \lfoot{\today}
-\rfoot{Page \thepage}
+\rfoot{Page \thepage\ of \pageref{LastPage}}
 
 % DOCUMENT
 \begin{document}
@@ -56,9 +62,9 @@ cat(paste(c("\\lhead{ExomeDepth ",sanitize(pipeversion),"}"),collate="",sep=""))
 \textbf{Panel:} \Sexpr{sanitize(panel[2])}
 (\Sexpr{sanitize(panel[1])}) \\
 \textbf{Genes:} \Sexpr{paste(selected.genes[order(selected.genes)],collapse=", ")}
-(\Sexpr{sanitize(length(coveredexons@ranges))} exons) \\
+(\Sexpr{sanitize(length(coveredexons@ranges))} segments) \\
 \textbf{Reference genome:} \Sexpr{paste(basename(referenceFasta))} \\
-\textbf{Normalisation method:} \Sexpr{paste(normalisation.method)} \\
+\textbf{Normalisation methods:} \Sexpr{paste(rev(names(results)))} \\
 \textbf{Transition probability:} \Sexpr{paste(threshold)} \\
 \textbf{QC configuration:} \Sexpr{sanitize(basename(extras))}
 \\
@@ -97,103 +103,108 @@ qcWarning<-function() {
   cat("\\end{warning}\n")
 }
 qcTable<-function() {
-  if (!is.na(predicted_qc)) {
-    oob.error<-rfc$err.rate[nrow(rfc$err.rate),"OOB"]
-    cat("\\begin{center}")
-    cat(paste("Random forest classifier predicts",
-      as.character(predicted_qc),
-      "at",
-      round(oob.error,3)*100,
-      "percent out-of-bag error rate"))
-    cat("\\end{center}")
+  message("Generating QC table...")
+  # split QC table in 3 sections
+  qc_tables<-list()
+  for (i in 1:length(qc)) {
+    rs <- names(qc)[i]
+    message(paste(i,rs))
+    if (i==1) {
+      # extract batch stats
+      qc_tables[["Intra-batch comparison"]]<-qc[[i]][1:4,]
+    }
+    table_name<-paste0("Reference set statistics (",toupper(names(qc)[i]),")")
+    qc_tables[[table_name]]<-qc[[i]][5:nrow(qc[[i]]),]
   }
 
-  # build footnote (explanations)
-  footnotes<-c("No warnings issued. QC passed.")
-  ftitle<-""
-  if (any(qc$status!="PASS")) {
-    footnotes<-vector()
-    ftitle<-"Warning:"
-    failed<-which(qc$status!="PASS")
-    if (1%in%failed || 2%in%failed) {
-      footnotes<-append(footnotes,
-        "The sample has a low RPKM correlation within the batch which likely indicates a failed sample.")
+  for (rs in rev(names(qc_tables))) {
+    cat(paste0("\\subsubsection*{",rs,"}\n"))
+    cat('\n')
+    # build footnote (explanations)
+    fnotes<-NA #c("No warnings issued. QC passed.")
+    ftitle<-""
+    if (any(qc_tables[[rs]]$status%in%c("FAIL","CAUTION"))) {
+      fnotes<-vector()
+      ftitle<-"Warning:"
+      failed<-rownames(qc_tables[[rs]])[which(qc_tables[[rs]]$status%in%c("CAUTION","FAIL"))]
+      if ("Median correlation in batch"%in%failed || "Maximum correlation in batch"%in%failed) {
+        fnotes<-append(fnotes,
+          "The sample has a low RPKM correlation within the batch which likely indicates a failed sample.")
+      }
+      if ("Coefficient of variation (CV)"%in%failed) {
+        fnotes<-append(fnotes,
+          "High coefficient of variation within sample (scatter). Check for batch effect.")
+      }
+      if ("CV Z-score within batch"%in%failed) {
+        fnotes<-append(fnotes,
+          "High coefficient of variation in relation to batch.")
+      }
+      if ("Correlation with reference"%in%failed) {
+        fnotes<-append(fnotes,
+          "Expect a higher false positive rate and reduced sensitivity due to low correlation with reference set.")
+      }
+      if ("Size of reference set"%in%failed) {
+        fnotes<-append(fnotes,
+          "The low number of reference samples could limit assay sensitivity if they contain the same alterations!")
+      }
+      if ("Forced minimum reference set size"%in%failed) {
+        fnotes<-append(fnotes,c(
+          "The size of the reference set was adjusted to be greater than 1 to preserve specificity,",
+          "  check selected reference samples for expected BF and correlation."))
+      }
+      if ("Expected BF with reference"%in%failed) {
+        fnotes<-append(fnotes,
+          "The expected BF for the chosen reference is low, indicating limited power of the statistical model.")
+      }
     }
-    if (3%in%failed) {
-      footnotes<-append(footnotes,
-        "High coefficient of variation within sample (scatter). Check for batch effect.")
-    }
-    if (4%in%failed) {
-      footnotes<-append(footnotes,
-        "High coefficient of variation in relation to batch.")
-    }
-    if (5%in%failed) {
-      footnotes<-append(footnotes,
-        "Expect a higher false positive rate and reduced sensitivity due to low correlation with reference set.")
-    }
-    if (6%in%failed) {
-      footnotes<-append(footnotes,
-        "The low number of reference samples could limit assay sensitivity if they contain the same alterations!")
-    }
-    if (7%in%failed) {
-      footnotes<-append(footnotes,c(
-        "The size of the reference set was adjusted to be greater than 1 to preserve specificity,",
-        "  check selected reference samples for expected BF and correlation."))
-    }
-    if (8%in%failed) {
-      footnotes<-append(footnotes,
-        "The expected BF for the chosen reference is low, indicating limited power of the statistical model.")
-    }
+    print(
+      kbl(qc_tables[[rs]],escape=T,booktabs=T) %>%
+      kable_styling(latex_options = "hold_position", font_size=7) %>%
+      row_spec(which(qc_tables[[rs]]$status=="FAIL"), bold = T, color = "white", background = "red") %>%
+      row_spec(which(qc_tables[[rs]]$status=="PASS"), background = "green") %>%
+      row_spec(which(qc_tables[[rs]]$status=="CAUTION"), color = "white", background = "orange") %>%
+      { if (any(!is.na(fnotes))) footnote(., general=paste(fnotes), general_title=ftitle) else . }
+    )  
   }
-  print(
-    kbl(qc,escape=T,booktabs=T) %>%
-    kable_styling(latex_options = "hold_position", font_size=7) %>%
-    row_spec(which(qc$status=="FAIL"), bold = T, color = "white", background = "red") %>%
-    row_spec(which(qc$status=="PASS"), background = "green") %>%
-    row_spec(which(qc$status=="CAUTION"), color = "white", background = "orange") %>%
-    footnote(general=paste(footnotes), general_title=ftitle)
-  )  
 }
-sampleTable<-function(ref) {
-  # calculate correlations
-  counts.refsamples<-counts[,refsamplenames]
-  counts.correlation<-cor(counts.refsamples)
-  refsample.table<-cbind(
-    ref$summary.stats,
-    #correlationmax=apply(counts.correlation[ref$summary.stats$ref.samples,],1,function(x) x[x!=1]),
-    #correlation=counts.correlation[ref$summary.stats$ref.samples,testsample],
-    depth.median=c(ref$summary.stats$median.depth[1], diff(ref$summary.stats$median.depth)),
-    reference=sapply(ref$summary.stats$ref.samples%in%ref$reference.choice, function(x) ifelse(x,TRUE,FALSE))
-  )
-  rs<-refsample.table[which(refsample.table$reference),c(
-    'expected.BF','phi','RatioSd','median.depth','correlations')]
-  cat("\\begin{scriptsize}")
-  # Print warning
-  fnotes<-""
-  ftitle<-""
-  if (any(!is.na(sexMismatch))) {
-    smm<-any(sexMismatch)
-    if (is.na(smm)) {
-      ftitle<-"Warning:"
-      fnotes<-"Could not confirm sex match for full reference set. CNV calls on sex chromosomes could be unreliable!"
-    } else if (smm) {
-      ftitle<-"Warning:"
-      fnotes<-"Mismatched sex in reference set. CNV calls on sex chromosomes will be unreliable!"
+refsampleTable<-function(ref) {
+  message('Generating reference sample table...')
+  for (rs in rev(names(ref))) {
+    cat(paste0("\\subsubsection*{Reference sample choice (",toupper(rs),")}"))
+    message(paste('Building refset table for',rs))
+    # calculate correlations
+    refsample.table<-ref[[rs]]$summary.stats
+    rs.table<-refsample.table[1:which(refsample.table$selected),c('expected.BF','phi','RatioSd','median.depth','correlations')]
+
+    cat("\\begin{scriptsize}")
+    # Print warning
+    fnotes<-""
+    ftitle<-""
+
+    if (any(!is.na(sexMismatch[[rs]]))) {
+      smm<-any(sexMismatch[[rs]])
+      if (is.na(smm)) {
+        ftitle<-"Warning:"
+        fnotes<-"Could not confirm sex match for full reference set. CNV calls on sex chromosomes could be unreliable!"
+      } else if (smm) {
+        ftitle<-"Warning:"
+        fnotes<-"Mismatched sex in reference set. CNV calls on sex chromosomes will be unreliable!"
+      } else {
+        fnotes<-"Reference set is sex-matched."
+      }
     } else {
-      fnotes<-"Reference set is sex-matched."
+      ftitle<-"Note:"
+      fnotes<-"No Sex match performed"
     }
-  } else {
-    ftitle<-"Note:"
-    fnotes<-"No Sex match performed"
+    print(
+      kbl(rs.table, booktabs=TRUE) %>%
+      row_spec(which(sexMismatch[[rs]]), bold = T, color = "white", background = "red") %>%
+      row_spec(which(!sexMismatch[[rs]]), background = "green") %>%
+      row_spec(which(is.na(sexMismatch[[rs]])), background = "white") %>%
+      footnote(general=fnotes, general_title=ftitle)
+    )
+    cat("\\end{scriptsize}")
   }
-  print(
-    kbl(rs, booktabs=TRUE) %>%
-    row_spec(which(sexMismatch), bold = T, color = "white", background = "red") %>%
-    row_spec(which(!sexMismatch), background = "green") %>%
-    row_spec(which(is.na(sexMismatch)), background = "white") %>%
-    footnote(general=fnotes, general_title=ftitle)
-  )
-  cat("\\end{scriptsize}")
 }
 lowCoverageExons<-function(pagerows=70) {
   if (nrow(coverage.table)>0) {
@@ -214,7 +225,7 @@ lowCoverageExons<-function(pagerows=70) {
     cat(paste0("Median coverage exceeds ",limits$coverage,"x in all target regions."))
   }
 }
-CNVtable<-function(cnvtable) {
+CNVtable<-function(cnvtable,footer) {
   footnotes=c(
     "¹The Bayes Factor (BF) is a measure of strength of evidence of the alternate hypothesis (copy number change)",
     " over the null hypothesis (no alteration). CNVs with negative Bayes Factor were omitted.",
@@ -228,55 +239,232 @@ CNVtable<-function(cnvtable) {
     kbl(cnvtable, escape=FALSE, row.names=FALSE, format='latex', booktabs=TRUE) %>%
     row_spec(2:nrow(cnvtable)-1,hline_after=TRUE) %>%
     row_spec(0,bold=TRUE) %>%
-    footnote(general=paste(footnotes), general_title="")
+    { if(footer) footnote(., general=paste(footnotes), general_title="") else . }
   )
   cat("\\end{scriptsize}\n")
 }
-plotCNVs<-function(res, cnvs, extend=1000, fullgene=TRUE) {
-  # reorder and remove BF<0
-  annot<-res@annotations
+multiPlotCNVs<-function(res,cnvlocs,extend=1000) {
   .pardefault<-par(no.readonly=TRUE)  # save plot environment
-  if (nrow(cnvs)>0) {
-    for (i in 1:nrow(cnvs)) {
-      message(paste(cnvs[i,],collapse=' '))
+  if (nrow(cnvlocs)==0) {
+    message('INFO: No CNVs to plot')
+    cat("\\textbf{NO CNVs TO PLOT}\n")
+  } else {
+    message('INFO: Plotting CNVs')
+    # get annotations from first not NA result
+    withResults<-names(res)[!is.na(res)]
+    annotidx<-withResults[1]
+    annot<-res[[annotidx]]@annotations
+    # get cnv plotting locations
+    cnvlocs<-unique(cnvlocs[,1:5])
+    for (i in 1:nrow(cnvlocs)) {
+      message(paste(cnvlocs[i,],collapse=' '))
       message('--------------\n')
-      # get plot limits
-      chromosome<-cnvs[i,'chromosome']
-      if (fullgene) {
-          # get gene limits
-          chrom<-cnvs[i,'chromosome']
-          chromStart<-cnvs[i,'start']
-          chromEnd<-cnvs[i,'end']
-          genes<-as.character(unique(annot[which(annot$chromosome==chrom & annot$end>chromStart & annot$start<chromEnd),'name']))
-          if (length(genes)>0) {
-              start<-min(annot[which(annot$name%in%genes),'start']) - extend
-              end<-max(annot[which(annot$name%in%genes),'end']) + extend
-          } else {
-              start<-cnvs[i,'start'] - extend
-              end<-cnvs[i,'end'] + extend
-          }
+      # get gene limits
+      chrom<-cnvlocs[i,'chromosome']
+      chromStart<-cnvlocs[i,'start']
+      chromEnd<-cnvlocs[i,'end']
+      cnvType<-cnvlocs[i,"type"]
+      genes<-as.character(unique(annot[which(annot$chromosome==chrom & 
+        annot$end>chromStart & annot$start<chromEnd),'name']))
+      if (length(genes)>0) {
+          start<-min(annot[which(annot$name%in%genes),'start']) - extend
+          end<-max(annot[which(annot$name%in%genes),'end']) + extend
       } else {
-          start<-cnvs[i,'start'] - extend
-          end<-cnvs[i,'end'] + extend
+          start<-cnvlocs[i,'start'] - extend
+          end<-cnvlocs[i,'end'] + extend
       }
       # get gene and exon names
-      e<-unlist(strsplit(as.character(cnvs[i,'exons.hg19']),'[,]'))
+      e<-unlist(strsplit(as.character(cnvlocs[i,'exons.hg19']),'[,]'))
       g<-unique(sapply(strsplit(as.character( e ),'_'),"[[",1))
-      # plot
-      possibleError<-tryCatch(
-        plot(res, sequence = chromosome, xlim = c(start, end), count.threshold = 20,
-          with.gene=TRUE, main=paste(g,collapse=',')),
-        error = function(err) err
-      )
-      # add CNV overlay and BF
-      cnvcolour<-ifelse(cnvs[i,'reads.ratio']<1, '#FF000044', '#00FF0044')
-      rect(as.numeric(cnvs[i,'start']), -0.1, cnvs[i,'end'], 1.1, col = cnvcolour, border=NA)
-      text(cnvs[i,'end'],0.7,pos=4,labels=cnvs[i,'BF'])# # annotate with Bayes Factor
-    }
-  }
+      gene_names <- paste(g, collapse=",")
+
+      #
+      # get annotation from first result object (their annotations are identical)
+      #
+      anno<-list()
+      for (rs in withResults) {
+        anno[[rs]] <- res[[rs]]@annotations
+        selected <- which(anno[[rs]]$chromosome == chrom &
+            anno[[rs]]$start >= start & anno[[rs]]$end <= end & 
+            (res[[rs]]@test + res[[rs]]@reference) * res[[rs]]@expected > 100)
+        if (length(selected) == 0) {
+            warning("No exon seem to be located in the requested region.
+              It could also be that the read count is too low for these exons? 
+              In any case no graph will be plotted.")
+            next
+        }
+        # select relevant exons
+        anno[[rs]] <- anno[[rs]][selected, ]
+        # get expected count
+        anno[[rs]]$expected <- res[[rs]]@expected[selected]
+        # get proportion of test coverage
+        anno[[rs]]$freq <- res[[rs]]@test[selected]/(
+          res[[rs]]@reference[selected] + res[[rs]]@test[selected])
+        # get middle of exons (x-axis)
+        anno[[rs]]$middle <- 0.5 * (anno[[rs]]$start + anno[[rs]]$end)
+        # get reads ratio (y-axis)
+        anno[[rs]]$ratio <- anno[[rs]]$freq/anno[[rs]]$expected
+        # add test count
+        anno[[rs]]$test <- res[[rs]]@test[selected]
+        # add reference count
+        anno[[rs]]$reference <- res[[rs]]@reference[selected]
+        # add total.counts
+        anno[[rs]]$total.counts <- anno[[rs]]$test + anno[[rs]]$reference
+        # add dispersion
+        anno[[rs]]$phi <- ifelse(length(res[[rs]]@phi) == 1, res[[rs]]@phi, res[[rs]]@phi[selected])
+        # confidence bands
+        for (i in 1:nrow(anno[[rs]])) {
+          anno[[rs]]$my.min.norm[i] <- qbetabinom(p = 0.025, size = anno[[rs]]$total.counts[i],
+            phi = anno[[rs]]$phi[i], prob = anno[[rs]]$expected[i])
+          anno[[rs]]$my.max.norm[i] <- qbetabinom(p = 0.975, size = anno[[rs]]$total.counts[i],
+            phi = anno[[rs]]$phi[i], prob = anno[[rs]]$expected[i])
+        }
+        anno[[rs]]$my.min.norm.prop <- anno[[rs]]$my.min.norm/anno[[rs]]$total.counts
+        anno[[rs]]$my.max.norm.prop <- anno[[rs]]$my.max.norm/anno[[rs]]$total.counts
+      }
+
+      #
+      # setup plot layout
+      #
+      panels <- length(anno)
+      heights <- c(rep(2,panels), 1)
+      xlim <- c(start, end)
+      # setup plotting panels (panels+gene)
+      mat <- matrix(data = 1:(panels+1), nrow = panels+1, ncol = 1)
+      layout(mat = mat, widths = rep(1, panels+1), heights = heights)
+
+      #
+      # Create read ratio plots
+      #
+      fmt_bg <- c('#FF000080', '#0000FF80')
+      fmt_fg <- c('red', 'blue')
+      fmt_an <- c(45, 135)
+      fmt_de <- c(20, 20)
+      for (rs in rev(names(anno))) {
+        fmt_idx <- which(rs==rev(names(anno)))
+        ylim <- c(0, max(anno[[rs]]$ratio,
+          1.25 * max(anno[[rs]]$my.max.norm.prop/anno[[rs]]$expected, na.rm = TRUE)))
+
+        # adjust margin
+        if (fmt_idx==1) {
+          par(mar = c(0, 4, 2, 2))
+        } else {
+          par(mar = c(1, 4, 1, 2))
+        }
+
+        # base plot
+        plot(x = NA, y = NA, ylim = ylim, xlim = xlim, ylab = paste("ratio",toupper(rs)),
+          xaxt = "n", main = ifelse(fmt_idx==1, gene_names, ""))
+
+        # normal range band
+        polygon(x = c(anno[[rs]]$middle, rev(anno[[rs]]$middle)),
+          y = c(
+            anno[[rs]]$my.min.norm.prop,
+            rev(anno[[rs]]$my.max.norm.prop)
+          ) / c(anno[[rs]]$expected, rev(anno[[rs]]$expected)),
+          col = fmt_bg[fmt_idx], angle=fmt_an[fmt_idx], density=fmt_de[fmt_idx], border = NA)
+        
+        # left margin range band
+        polygon(x = c(start, anno[[rs]]$middle[1], anno[[rs]]$middle[1], start),
+          y = c(
+            rep(anno[[rs]]$my.min.norm.prop[1], 2),
+            rep(anno[[rs]]$my.max.norm.prop[1], 2)
+          ) / anno[[rs]]$expected[1],
+          col = fmt_bg[fmt_idx], angle=fmt_an[fmt_idx], density=fmt_de[fmt_idx], border = NA)
+          # col = "grey", border = "grey")
+        
+        # right margin range band
+        nr <- nrow(anno[[rs]])
+        polygon(x = c(end, anno[[rs]]$middle[nr], anno[[rs]]$middle[nr], end),
+          y = c(
+            rep(anno[[rs]]$my.min.norm.prop[nr], 2),
+            rep(anno[[rs]]$my.max.norm.prop[nr], 2)
+          ) / anno[[rs]]$expected[nr],
+          col = fmt_bg[fmt_idx], angle=fmt_an[fmt_idx], density=fmt_de[fmt_idx], border = NA, lty = 1)
+          # col = "grey", border = "grey", lty = 1)
+        
+        # reads ratio
+        points(x = anno[[rs]]$middle[order(anno[[rs]]$middle)],
+          y = anno[[rs]]$ratio[order(anno[[rs]]$middle)],
+          type = "b", pch = "+", col = fmt_fg[fmt_idx])
+        
+        # add CNV overlay
+        cnv<-res[[rs]]@CNV.calls[which(chromStart == res[[rs]]@CNV.calls$start & 
+          chromEnd == res[[rs]]@CNV.calls$end),]
+        if (nrow(cnv)==1) {
+          cnvcolour<-ifelse(cnv$reads.ratio<1, '#FF000044', '#00FF0044')
+          rect(chromStart, ylim[1], chromEnd, ylim[2], col = cnvcolour,
+            border=cnvcolour,lwd=5)
+          text(cnv$end,0.7,pos=4,labels=cnv$BF) # annotate with Bayes Factor
+        }
+      }
+
+      #
+      # plot gene data (take annotation from first result)
+      #
+      par(mar = c(2, 4, 0, 2))
+      plot(x = NA, y = NA, ylim = c(0, 1), xlim = xlim,
+          yaxt = "n", ylab = "", xlab = "", xaxt = "n")
+      # axis ticks at bottom
+      my.pos <- axTicks(side = 1)
+      axis(side = 1, at = my.pos, labels = as.integer(my.pos))
+      # get exons within range of plot
+      selected <- which(anno[[1]]$chromosome == chrom & anno[[1]]$start >=
+          xlim[1] & anno[[1]]$end <= xlim[2])
+      selected.2 <- max(min(selected) - 1, 1):min(max(selected) +
+          1, nrow(anno[[1]]))
+      exon.array <- anno[[1]][selected.2, , drop = FALSE]
+      exon.array$short.name <- gsub(exon.array$name, pattern = "-.*", replacement = "")
+      if (nrow(exon.array) > 1) {
+        if (exon.array$short.name[1] != exon.array$short.name[2]) {
+          exon.array <- exon.array[-1, ]
+        }
+        if (nrow(exon.array) > 1 && (exon.array$short.name[nrow(exon.array)] !=
+          exon.array$short.name[nrow(exon.array) - 1])) {
+          exon.array <- exon.array[-nrow(exon.array),]
+        }
+      }
+      exon.array$start.gene <- tapply(INDEX = exon.array$short.name,
+          exon.array$start, FUN = min)[exon.array$short.name]
+      exon.array$middle <- 0.5 * (exon.array$start + exon.array$end)
+      # print exons
+      if (nrow(exon.array) >= 1) {
+        pos <- 1
+        lev <- 0.4
+        arr <- by(exon.array, exon.array$start.gene, FUN = function(x) {
+          my.x <- range(x$middle)
+          lines(x = my.x, y = c(lev, lev))
+          my.x <- mean(range(x$middle))
+          if (my.x < xlim[1]) my.x <- xlim[1]
+          if (my.x > xlim[2]) my.x <- xlim[2]
+          # gene name
+          text(x = my.x, y = ifelse(lev == 0.6, 0.7, 0.3),
+            labels = x$short.name[1], pos = pos, cex = 0.5)
+          # exon ticks
+          for (i in 1:nrow(x)) {
+            lines(x = c(x$middle[i], x$middle[i]), y = c(lev - 0.1, lev + 0.1))
+          }
+          if (pos == 1) {
+            pos <<- 3
+            lev <<- 0.6
+          }
+          else {
+            pos <<- 1
+            lev <<- 0.4
+          }
+        })
+      }
+      # add CNV overlay
+      cnvcolour<-ifelse(cnvType=="deletion", '#FF000044', '#00FF0044')
+      rect(chromStart, 0, chromEnd, 1, col = cnvcolour,
+        border=cnvcolour, lwd=5)
+    } # end CNV loop
+  } # end any CNV
   par(.pardefault) # restore plot environment
 }
+
 plotRefsampleStats<-function() {
+  # cat("\\subsubsection*{Intra-batch statistics}\n")
   # plotting colours
   highlight.col<-ifelse(colnames(batch.cor)==testsample,'hotpink','gray')
   highlight.pch<-ifelse(colnames(batch.cor)==testsample,19,1)
@@ -289,8 +477,8 @@ plotRefsampleStats<-function() {
   mtext("Note: Low correlation within batch could be due to high number of CNAs. Check set limits.",1)
   # Coeff of variation plot
   keep.finite<-function(X) X[is.finite(X)]
-  ymin<-min(keep.finite(c(limits$coeffvar,unlist(cvz.bands),batch.cv)))
-  ymax<-max(keep.finite(c(limits$coeffvar,unlist(cvz.bands),batch.cv)))
+  ymin<-min(keep.finite(c(limits$coeffvar,batch.cv)))
+  ymax<-max(keep.finite(c(limits$coeffvar,batch.cv)))
   margin<-(ymax-ymin)*0.1
   # generate plot surface
   plot(batch.cv, xaxt="n", xlab=NA, ylab=NA, ylim=c(ymin-margin,ymax+margin), type="n")
@@ -316,33 +504,56 @@ plotRefsampleStats<-function() {
 }
 @
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Build PDF document %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 <<table, size='footnotesize', results='asis', echo=FALSE, message=FALSE, fig.width=9, fig.height=4, out.width='1.0\\linewidth' >>=
 # NB Assay info header printed above
 # Sample header
 cat(paste0('\\section{',sanitize(samplename),'}'))
 cat(paste0('\\textbf{Filename: }',sanitize(testsample)))
 # qc check (indicates that a QC measure has failed)
-failedQC<-any(qc$status!="PASS")
+failedQC<-any(unlist(lapply(qc, function(x) x$status!="PASS")))
 failedCoverage<-nrow(coverage.table)>0
-failedSexmatch<-!any(is.na(sexMismatch)) && any(sexMismatch)
+failedSexmatch<-any(unlist(lapply(sexMismatch, function(x) !any(is.na(x)) && any(x))))
 if (failedQC || failedCoverage || failedSexmatch) {
   cat("\\\\")
   qcWarning()
 }
+
+
 # CNV results
 cat("\\subsection*{Called CNVs}")
-if (suppressWarnings(is.na(results[[testsample]]))) {
-  cat("\\textbf{NEED AT LEAST 2 REFERENCE SAMPLES TO RUN CNV ANALYSIS.}\n")
-} else {
-  # PRINT CNVs
-  if (!is.object(results[[testsample]])) {
+# print CNV tables
+cnvloc<-data.frame()
+for (rs in rev(names(results))) {
+  cat(paste0("\\subsubsection*{",toupper(rs)," normalisation}"))
+  if (class(results[[rs]])!="ExomeDepth") {
     cat('\n\n\n')
     cat("\\textbf{NO CNVs CALLED IN REGION OF INTEREST.}")
   } else {
-    # # filter CNVs (sort by BF and remove negative BF and unannotated)
-    cnvs<-results[[testsample]]@CNV.calls
+    cnvs<-results[[rs]]@CNV.calls
+    # match CNVs between refsets
+    cnv_match <- list()
+    match_col <- vector()
+    for (crs in names(results)) {
+      if (crs!=rs) {
+        if (class(results[[crs]])!="ExomeDepth") {
+          cnv_match[[crs]]<-""
+        } else {
+          match_col <- append(match_col, crs)
+          cnv_merged<-cnvs %>% left_join(results[[crs]]@CNV.calls,
+            by=c('start.p','end.p'))
+          cnv_match[[crs]]<-ifelse(!is.na(cnv_merged$chromosome.y),"\\checkmark","")
+        } 
+      }
+    }
+    cnvs <- cbind(cnvs, data.frame(cnv_match))
+    # filter CNVs (sort by BF and remove negative BF)
     cnvs<-cnvs[order(cnvs$BF, decreasing = TRUE),]
     cnvs<-cnvs[which(cnvs$BF>0),]
+    # filter unannotated CNVs (out of ROI scope)
     cnvs<-cnvs[which(not.na(cnvs$exons.hg19)),]
     # render CNV data
     if (!!nrow(cnvs)) {
@@ -358,43 +569,41 @@ if (suppressWarnings(is.na(results[[testsample]]))) {
         # make all annotations an empty string instead of plotting NA
         cnvs[,'annotation']<-""
       }
+
+      # combine cnvs (add source)
+      cnvloc<-rbind(cnvloc,
+        cbind(cnvs[,c("chromosome","start","end","exons.hg19","type")], source=rs))
+
       # create CNV table
       cnvtable<-cnvs[,c('id','BF','reads.expected','reads.ratio',
-                        'type','genes','confidence','annotation')]
+                        'type','genes','confidence','annotation',match_col)]
       colnames(cnvtable)<-c('id','BF¹','expected','ratio',
-                            'type','genes²','confidence³','annotation°')
+                            'type','genes²','confidence³','annotation°',match_col)
       # make column names shorter
-      CNVtable(cnvtable)
-      #cat("\\begin{verse}Coverage plots on following page.\\end{verse}")
-      #cat('\n\\newpage')
-      cat("\\subsubsection*{Coverage plots}\n")
-      cat("\\begin{multicols*}{2}\n")
-      plotCNVs(results[[testsample]],cnvs)
-      cat("\\end{multicols*}\n")
+      add_footer<-which(rev(names(results))==rs)==length(results)
+      CNVtable(cnvtable, add_footer)
     } else {
       cat('\n\n\n')
-      cat("\\textbf{NO CNVs CALLED IN REGION OF INTEREST.}\n")
+      cat("\\textbf{NO CNVs CALLED IN REGION OF INTEREST}\n")
     }
   }
 }
+
+# Print coverage plots
+cat('\\newpage\n')
+cat("\\subsubsection*{Coverage plots}\n")
+cat("\\begin{multicols*}{2}\n")
+multiPlotCNVs(results, cnvloc)
+cat("\\end{multicols*}\n")
+
+# Print QC stuff
 cat('\\newpage\n')
 cat("\\subsection*{Quality Control}\n")
 qcTable()
-cat("\\subsubsection*{Batch statistics}\n")
 plotRefsampleStats()
-# PRINT REFERENCE SAMPLES
-cat("\\subsubsection*{Reference sample choice}\n")
-sampleTable(refsets[[testsample]])
-# plot lowCoverageExons
+refsampleTable(refsets[[testsample]])
 cat("\\subsubsection*{Coverage limitations}\n")
 lowCoverageExons()
-
-
-
-#cat("\\\\")
-#cat("\\begin{center}")
-# cat("\\textit{--- END OF REPORT ---}")
-#cat("\\end{center}")
 @
 
 \end{document}

@@ -8,6 +8,7 @@ REGISTRY := seglh
 IMG           := $(REGISTRY)/$(APP)
 IMG_VERSIONED := $(IMG):$(BUILD)
 IMG_LATEST    := $(IMG):latest
+IMG_DEV       := $(IMG):dev
 
 .PHONY: push build version cleanbuild
 
@@ -19,8 +20,12 @@ build: version
 	docker buildx build --platform linux/amd64 -t $(IMG_VERSIONED) . || docker build -t $(IMG_VERSIONED) .
 	docker tag $(IMG_VERSIONED) $(IMG_LATEST)
 
+cleanbuild: version
+	docker buildx build --platform linux/amd64 --no-cache -t $(IMG_VERSIONED) . || docker build -t $(IMG_VERSIONED) .
+	docker tag $(IMG_VERSIONED) $(IMG_LATEST)
+
+devbuild: version
+	docker build -t $(IMG_DEV) .
+
 version:
 	echo $(BUILD) > VERSION
-
-cleanbuild:
-	docker buildx build --platform linux/amd64 --no-cache -t $(IMG_VERSIONED) .

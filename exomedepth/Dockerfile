@@ -42,14 +42,17 @@ RUN tlmgr install framed && \
 	tlmgr install colortbl && \
 	tlmgr install parskip && \
 	tlmgr install fancyhdr && \
+	tlmgr install lastpage && \
+	tlmgr install pgf && \
 	tlmgr install xcolor
 
 # set CRAN mirror
-RUN echo 'options(repos=structure(c(CRAN="http://cran.ma.imperial.ac.uk/")))' > /root/.Rprofile
+RUN echo 'options(repos=structure(c(CRAN="http://cran.ma.imperial.ac.uk/")))' > /root/.Rprofile && \
+    echo 'options(BioC_mirror="http://bioconductor.statistik.tu-dortmund.de/")' >> /root/.Rprofile
 
 # R packages (BioC)
-RUN Rscript -e "install.packages('BiocManager');BiocManager::install(version = '3.15')" && \
-	Rscript -e "BiocManager::install(c('Biostrings','IRanges','Rsamtools','GenomicRanges','GenomicAlignments'))"
+RUN Rscript -e "install.packages('BiocManager');BiocManager::install(version = '3.15', ask = FALSE)"
+RUN Rscript -e "BiocManager::install(c('Biostrings','IRanges','Rsamtools','GenomicRanges','GenomicAlignments'))"
 
 # R packages (CRAN)
 RUN Rscript -e "install.packages('optparse')" && \
@@ -60,8 +63,13 @@ RUN Rscript -e "install.packages('optparse')" && \
 	Rscript -e "install.packages('knitr')" && \
 	Rscript -e "install.packages('kableExtra')" && \
 	Rscript -e "install.packages('tinytex')" && \
-	Rscript -e "install.packages('xtable')"
-#RUN Rscript -e "install.packages('Hmisc')"
+	Rscript -e "install.packages('xtable')" && \
+	Rscript -e "install.packages('moments')"
+
+# install ED from source as CRAN rejected ED (10/2022) v1.1.16
+# CRAN reinstated ED (11/2020) v1.1.16
+#RUN Rscript -e "install.packages('devtools')" && \
+#    Rscript -e "require(devtools);install_github('vplagnol/ExomeDepth', ref='7f6f8621801d1eb46880f88c4f71bb7c31680c73')"
 
 # add exomedepth scripts and report template
 ADD readCount.R /root

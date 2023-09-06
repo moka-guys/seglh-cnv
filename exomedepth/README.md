@@ -53,6 +53,8 @@ docker run -it \
 	/data/sample4.bam
 ```
 
+
+
 ### Step 2 - Run Exomedepth
 
 This steps will pick the most appropriate reference samples and run exomedepth for a given sample.
@@ -84,6 +86,10 @@ Exomedepth, as default, runs with intra-batch normalisation (normals are picked 
 ### Panel of Normals (PoN)
 
 To run exomedepth in PoN mode, supply normal BAMs to the readCount step as any other BAM file, but ensure their name is prefixed with _NORMAL_. This will automatically switch to PoN mode. The used normalisation mode is also indicated on the PDF reports, alongside the picked normal samples.
+
+Any normals that have low coverage (below 100X) in _any_ of the supplied target regions will automatically be dropped as a safety measure.
+
+If a Panel of Normals is supplied, the `readCount.R` script will pick reference sets for both, the PoN and the supplied batch, under the condition that there are at least 3 reference samples to choose from.
 
 To avoid recounting reads for the normal samples, a `readCount.RData` file from a previous run can be supplied and the normals contained in this run will be merged into the counts table. Normal BAMs supplied will not be recounted if they are in the RData file.
 
@@ -193,7 +199,6 @@ CNVs will be annotated if they overlap at least 10 percent with any additional a
 
 SEGLH-Exomedepth can optionally provide a QC classification based on previous labeled data. The classfier is automatically optimised for the number of random variables considered and runs 200 trees by default. All labeled samples are part of the training set.
 
-
 The model can be built as follows:
 
 1. Amend a column with header `status` to the CSV metrics output from the `readCount.R` step.
@@ -211,7 +216,7 @@ Often the complete negative status of a potential normal sample is not known. th
 
 The following steps are recommended to further reduce a set of likely-normals to a more stringent set of normals, by excluding samples that do have reproducible CNVs in a within-batch normalisation approach.
 
-The `getNormals.sh` script implements an example of the steps below.
+The `utils/getNormals.sh` script implements an example of the steps below.
 
 #### Read counting for pool of normals
 
@@ -221,7 +226,7 @@ Run the readcount step as normal supplying the PoN candidates.
 
 Run the resampling script. As default, 30 samples are picked from the pool 100 times, for all samples in sequence. For large sets of normals, the runs can be split into multiple parallel runs by specifying start and end samples.
 
-`Rscript bootstrapCnv.R readcounts.RData [BOOTSTRAP:100] [SAMPLESIZE:30] [FROM:1] [TO:samplecount]`
+`Rscript bootstrapCnv.R readcounts.RData [BOOTSTRAP:100] [SAMPLESIZE:30] ([FROM:1] [TO:samplecount])`
 
 A BED file with known highly variable regions (common CNVs) can be supplied as the last argument.
 
@@ -232,12 +237,14 @@ The output files are named according to the input file and time stamped:
 
 #### Filtering
 
-The user can either manuall assess the returned bootstrapped CNV calls or rely on the integrated filtering.
-The filtering aims to identify samples that have hghly reproducible CNV calls and therefore do not meet the normal expectation.
+The user can either manually assess the returned bootstrapped CNV calls or rely on the integrated filtering.
+The filtering aims to identify samples that have highly reproducible CNV calls and therefore do not meet the normal expectation.
 
 To run the filtering, supply a previous _scores_ file to the command line:
 
 `Rscript bootstrapCnv.R readcounts.210912T130216.RData 100 30 readcounts.210912T130216.scores`
+
+NB: If previous runs have been partitioned, ensure the scores files are concatenated before initiating the filtering step.
 
 The following filter steps are applied in order:
 
@@ -245,7 +252,12 @@ The following filter steps are applied in order:
 2. Remove CNVs with high entropy (>2) and prevalence (>0.4) in the bootstrap (highly variable CNVs)
 3. Remove CNVs with less than 0.5 bootstrap frequency (unstable CNVs or noise).
 
-The excluded samples are printed. If these are considered appropriate, one can rerun the bootrapping processing while excluding htese samples by appending `RUN` as an additional argument.
+The excluded samples are printed on screen.
 
-This process can be iterated multiple times. However, this does not prevent from overfitting the normal set.
+#### Re-test normals (iterate)
+If the excluded samples are considered appropriate, one can rerun the bootrapping processing while excluding these samples by appending `RUN` as an additional argument.
+
+`Rscript bootstrapCnv.R readcounts.210912T130216.RData 100 30 readcounts.210912T130216.scores RUN`
+
+This process can be iterated multiple times. However, this could lead to overfitting the normal set.
 
