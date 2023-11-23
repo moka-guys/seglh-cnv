@@ -87,8 +87,6 @@ Exomedepth, as default, runs with intra-batch normalisation (normals are picked 
 
 To run exomedepth in PoN mode, supply normal BAMs to the readCount step as any other BAM file, but ensure their name is prefixed with _NORMAL_. This will automatically switch to PoN mode. The used normalisation mode is also indicated on the PDF reports, alongside the picked normal samples.
 
-Any normals that have low coverage (below 100X) in _any_ of the supplied target regions will automatically be dropped as a safety measure.
-
 If a Panel of Normals is supplied, the `readCount.R` script will pick reference sets for both, the PoN and the supplied batch, under the condition that there are at least 3 reference samples to choose from.
 
 To avoid recounting reads for the normal samples, a `readCount.RData` file from a previous run can be supplied and the normals contained in this run will be merged into the counts table. Normal BAMs supplied will not be recounted if they are in the RData file.
