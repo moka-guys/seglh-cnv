@@ -22,7 +22,7 @@ normalprefix<-'NORMAL'
 cmp.cols<-3
 sex<-regex('_[MF]_')
 min.refs<-2
-mincov.pon<-100
+mincov.pon<-0
 #
 # READ ARGS
 #

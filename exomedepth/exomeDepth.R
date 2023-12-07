@@ -1,24 +1,4 @@
 # R script for exome depth data (takes a readcount data object created by readCount.R)
-#
-# INSTALL PACKAGES
-#
-options(menu.graphics=FALSE)
-options(repos=structure(c(CRAN="http://cran.ma.imperial.ac.uk/")))
-if (!("ExomeDepth" %in% installed.packages())) {
-  # install dependencies
-  if (!require("BiocManager", quietly = TRUE)) {
-    install.packages("BiocManager")
-    BiocManager::install(version = "3.15")
-  }
-  BiocManager::install(c("Biostrings", "Rsamtools", "GenomicRanges", "GenomicAlignments"))
-  # install ED
-  if (!require("BiocManager", quietly = TRUE)) install.packages("devtools")
-  install_github("vplagnol/ExomeDepth")
-  install.packages("ExomeDepth",dependencies=TRUE)
-}
-if (!("knitr" %in% installed.packages())) install.packages("knitr",dependencies=TRUE)
-if (!("kableExtra" %in% installed.packages())) install.packages("kableExtra",dependencies=TRUE)
-
 
 #
 # LOAD LIBRARIES

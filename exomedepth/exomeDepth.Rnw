@@ -534,22 +534,24 @@ for (rs in rev(names(results))) {
     cat("\\textbf{NO CNVs CALLED IN REGION OF INTEREST.}")
   } else {
     cnvs<-results[[rs]]@CNV.calls
-    # match CNVs between refsets
-    cnv_match <- list()
+    # match CNVs between refsets if there is more than one
     match_col <- vector()
-    for (crs in names(results)) {
-      if (crs!=rs) {
-        if (class(results[[crs]])!="ExomeDepth") {
-          cnv_match[[crs]]<-""
-        } else {
-          match_col <- append(match_col, crs)
-          cnv_merged<-cnvs %>% left_join(results[[crs]]@CNV.calls,
-            by=c('start.p','end.p'))
-          cnv_match[[crs]]<-ifelse(!is.na(cnv_merged$chromosome.y),"\\checkmark","")
-        } 
+    if (length(names(results))>1) {
+      cnv_match <- list()
+      for (crs in names(results)) {
+        if (crs!=rs) {
+          if (class(results[[crs]])!="ExomeDepth") {
+            cnv_match[[crs]]<-""
+          } else {
+            match_col <- append(match_col, crs)
+            cnv_merged<-cnvs %>% left_join(results[[crs]]@CNV.calls,
+              by=c('start.p','end.p'))
+            cnv_match[[crs]]<-ifelse(!is.na(cnv_merged$chromosome.y),"\\checkmark","")
+          } 
+        }
       }
+      cnvs <- cbind(cnvs, data.frame(cnv_match))
     }
-    cnvs <- cbind(cnvs, data.frame(cnv_match))
     # filter CNVs (sort by BF and remove negative BF)
     cnvs<-cnvs[order(cnvs$BF, decreasing = TRUE),]
     cnvs<-cnvs[which(cnvs$BF>0),]
