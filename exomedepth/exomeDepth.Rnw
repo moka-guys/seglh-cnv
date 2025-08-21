@@ -545,7 +545,7 @@ for (rs in rev(names(results))) {
           } else {
             match_col <- append(match_col, crs)
             cnv_merged<-cnvs %>% left_join(results[[crs]]@CNV.calls,
-              by=c('start.p','end.p'))
+              by=c('start','end'))
             cnv_match[[crs]]<-ifelse(!is.na(cnv_merged$chromosome.y),"\\checkmark","")
           } 
         }

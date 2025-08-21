@@ -13,6 +13,7 @@ require(warn.conflicts=FALSE,quietly=FALSE,package="randomForest")
 require(warn.conflicts=FALSE,quietly=FALSE,package="Rsamtools")
 require(warn.conflicts=FALSE,quietly=FALSE,package="stringr")
 require(warn.conflicts=FALSE,quietly=FALSE,package="dplyr")
+require(warn.conflicts=FALSE,quietly=FALSE,package="tidyr")
 source('ed2vcf.R')
 
 #
@@ -46,6 +47,30 @@ message(paste("Running", pipeversion))
 # loads counts,samplenames,rois (extended exons.hg19)
 load(args[4])
 extras<-args[6]
+
+# get bed file for filtering
+df_bed <- read.table(panel[1], header = FALSE, sep = "\t", col.names = c("chromosome", "start", "end", "name"))
+df_bed$chromosome <- as.character(df_bed$chromosome)
+rois$chromosome <- as.character(rois$chromosome)
+# merged cnv bed with rois that is same as readcount bed file in order to get the exon number info 
+# which is present only in readcount bed but not in CNV bed
+df_merged <- left_join(df_bed, rois, by = c("chromosome", "start", "end"))
+# check if any regions present in CNV bed are absent in readcount bed
+# if any regions in cnv bed are absent in readcount bed, replace NA with Unknown_gene
+if(any(is.na(df_merged$name.y))) {
+  print("WARNING: some regions in CNV bed are absent in readcount bed")
+  print(df_merged[is.na(df_merged$name.y), ])
+  df_merged$name.y[is.na(df_merged$name.y)] <- "Unknown_gene"
+  }
+
+# rename cols
+df_merged <- df_merged %>%
+                rename(
+                gene = name.x,
+                gene_exonnum = name.y
+              )
+# remove duplicated rows
+df_bed_nodup <- df_merged[!duplicated(df_merged), ]
 
 #
 # report run configuration
@@ -83,7 +108,7 @@ if (length(names(refsamplenames))>0) {
                   GRanges(seqnames = V1, IRanges(start=V2+1, end=V3, names=V4),names=V4))  # BED FILE 0-based
   coveredexons<-subsetByOverlaps(exons,covered)
   ce<-data.frame(seqnames=seqnames(coveredexons), starts=start(coveredexons)-1, ends=end(coveredexons), name=mcols(coveredexons)$names)
-  selected.genes<-unique(sapply(strsplit(ce$name,'_'),function(x) x[1]))
+  selected.genes<-unique(sapply(strsplit(df_bed_nodup$gene_exonnum,'_'),function(x) x[1]))
 
   #
   # set defaults and load QC limits (override)
@@ -279,6 +304,49 @@ if (length(names(refsamplenames))>0) {
       cnvs.annotated@annotations$name <- as.factor(
         sapply(strsplit(
           as.character(cnvs.annotated@annotations$name), '_'), "[[", 1))
+      
+      if (nrow(cnvs.annotated@CNV.calls) > 0) {
+        # get the non NA row which are actual CNV call 
+        cnvcall <- cnvs.annotated@CNV.calls[!is.na(cnvs.annotated@CNV.calls$exons.hg19), ]
+        if (nrow(cnvcall) > 0) {
+          updated_cnv <- data.frame()
+          for (i in 1:nrow(cnvcall)) {
+            # subset each row
+            df_subset <- cnvcall[i:i,]
+            # expand the row for individual exon number
+            cnvcall_expanded <- df_subset %>%
+                              separate_rows(exons.hg19, sep = ",")
+            # join with bed file to filter out regions that are not present in cnv bed
+            cnv_bed <- inner_join(cnvcall_expanded, df_bed_nodup, by = c("exons.hg19" = "gene_exonnum"))
+            
+            # replace the start and end with correct interval
+            cnv_bed$start.x <-min(cnv_bed$start.y)+1 # to make 1 based interval
+            cnv_bed$end.x <-max(cnv_bed$end.y)
+            # drop unnecessary col
+            cnv_bed <- subset(cnv_bed, select = -c(id, chromosome.y, start.y, end.y, gene))
+            # replace id col with correct interval
+            cnv_bed$id <- paste0("chr",cnv_bed$chromosome.x,":", cnv_bed$start.x,"-", cnv_bed$end.x)
+            # rename the col
+            cnv_bed <- cnv_bed %>%
+                    rename(
+                    start = start.x,
+                    end = end.x,
+                    chromosome = chromosome.x
+                  )
+            # collapse back into single row
+            cnv_summary <- cnv_bed %>%
+                        group_by(across(-exons.hg19)) %>%
+                        summarise(exons.hg19= paste(exons.hg19, collapse = ","), .groups = "drop")
+            # append into updated_csv
+            updated_cnv <- rbind(updated_cnv, cnv_summary)
+          }
+          # replace old cnv call regions with updated cnv regions
+          cnvs.annotated@CNV.calls <- cnvs.annotated@CNV.calls %>%
+                                 filter(!exons.hg19 %in% updated_cnv$exons.hg19) %>%
+                                 bind_rows(updated_cnv)
+        }
+      }
+
       results[[rs]] <- cnvs.annotated
     } else {
       message(paste('No CNVs called with refset',toupper(rs)))
