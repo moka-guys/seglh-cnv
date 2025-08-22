@@ -64,13 +64,16 @@ RUN Rscript -e "install.packages('optparse')" && \
 	Rscript -e "install.packages('kableExtra')" && \
 	Rscript -e "install.packages('tinytex')" && \
 	Rscript -e "install.packages('xtable')" && \
-	Rscript -e "install.packages('moments')"
+	Rscript -e "install.packages('moments')" && \
+	Rscript -e "install.packages('tidyr')" 
 
 # install ED from source as CRAN rejected ED (10/2022) v1.1.16
 # CRAN reinstated ED (11/2020) v1.1.16
 #RUN Rscript -e "install.packages('devtools')" && \
 #    Rscript -e "require(devtools);install_github('vplagnol/ExomeDepth', ref='7f6f8621801d1eb46880f88c4f71bb7c31680c73')"
-
+# ExomeDepth package is no longer available on CRAN so need to install from github, use ref for v1.1.16 which is existing version
+RUN Rscript -e "install.packages('remotes'); remotes::install_github('vplagnol/ExomeDepth', ref='7f6f8621801d1eb46880f88c4f71bb7c31680c73')" 
+RUN R -e "installed_packages <- installed.packages(); print(installed_packages[, c(1, 3)])"
 # add exomedepth scripts and report template
 ADD readCount.R /root
 ADD ed2vcf.R /root
