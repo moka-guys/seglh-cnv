@@ -33,19 +33,19 @@ ed2vcf<-function(x, filename, fasta, roi, samplename) {
           "End position of the variant described in this record",
           "Confidence interval around POS",
           "Confidence interval around END",
-          "Affected genes (regions)")
+          "Affected genes regions")
       ),
       FORMAT=data.frame(
         ID=c("GT","SM","CN","BC","BF","EL"),
         Number=c("1","1","1","1","1","1"),
         Type=c("String","Float","Integer","Integer","Float","String"),
         Description=c(
-          "Genotype",
+          "\"Genotype\"",
           "Linear copy ratio of the segment mean",
           "Estimated copy number",
           "Number of bins in the region",
           "Bayes Factor",
-          "Evidence level (Lee and Wagenmakers, 2013)")
+          "Evidence level Lee and Wagenmakers 2013")
       )
     )
 
@@ -148,18 +148,22 @@ ed2vcf<-function(x, filename, fasta, roi, samplename) {
           # single element
           if (grepl(" ", vcf$header[[i]])) {
             ## has space, add quotes
-            vcf$header[[i]] <- dQuote(vcf$header[[i]])
+            vcf$header[[i]] <- paste0("\"", vcf$header[[i]], "\"")
           }
           cat(paste0("##", names(vcf$header)[i], "=", vcf$header[[i]], "\n"), file = filename, append = TRUE)
         } else {
           # muliple elements
-          cat(paste0("##", names(vcf$header)[i], "=<", paste(paste(names(vcf$header[[i]]), dQuote(vcf$header[[i]]), sep = "="), collapse = ","), 
+          cat(paste0("##", names(vcf$header)[i], "=<", paste(paste(
+                    names(vcf$header[[i]]),
+                    paste0("\"", vcf$header[[i]], "\""),
+                    sep = "="
+                  ), collapse = ","), 
                   ">\n"), file = filename, append = TRUE)
         }
       } else {
         # complex (dataframe)
         vcf$header[[i]] <- apply(vcf$header[[i]], 1, function(vcf, name) {
-          vcf[grepl(" ", vcf)] <- dQuote(vcf[grepl(" ", vcf)])
+          vcf[grepl(" ", vcf)] <- paste0("\"", vcf[grepl(" ", vcf)], "\"")
           paste0(name, "=", vcf)
         }, colnames(vcf$header[[i]]))
         vcf$header[[i]] <- apply(vcf$header[[i]], 2, function(vcf, name) {
